@@ -33,16 +33,20 @@ async function tick() {
 
   await git(["add", "-A"]);
   const noChanges = (await git(["diff", "--cached", "--quiet"])) === 0;
-  if (noChanges) return;
+  if (!noChanges) {
+    const stamp = new Date().toISOString().replace("T", " ").slice(0, 19);
+    await git(["commit", "-m", `Auto backup: ${stamp}`, "--quiet"]);
+    console.log(`[auto-backup] committed changes at ${stamp}`);
+  }
 
-  const stamp = new Date().toISOString().replace("T", " ").slice(0, 19);
-  await git(["commit", "-m", `Auto backup: ${stamp}`, "--quiet"]);
-  console.log(`[auto-backup] committed changes at ${stamp}`);
+  // Best-effort push — also syncs manual commits, silently skipped if offline/no remote
+  const pushed = (await git(["push", "origin", "main", "--quiet"])) === 0;
+  if (pushed) console.log("[auto-backup] synced to GitHub");
 }
 
 export function startAutoCommit() {
   if (globalThis.__buonBanXeAutoCommitTimer) return;
-  console.log("[auto-backup] active — checking for changes every 10 minutes while the app is running");
+  console.log("[auto-backup] active — checking for changes and syncing to GitHub every 10 minutes while the app is running");
   const timer = setInterval(() => {
     tick().catch(() => {});
   }, INTERVAL_MS);

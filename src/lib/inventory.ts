@@ -63,7 +63,6 @@ export type ParsedCommand =
   | { type: "edit"; target: string; field: string; value: string }
   | { type: "note"; target: string; note: string }
   | { type: "near"; hours: number }
-  | { type: "profit"; days: number }
   | { type: "unknown"; reason: string };
 
 function normalizeName(name: string) {
@@ -328,6 +327,29 @@ export function parseCommand(input: string): ParsedCommand {
     return { type: "find", name: normalizeName(findMatch[1]) };
   }
 
+  // sửa #3 tên GTR-R35 | sửa GTR giá 12m
+  const editMatch = text.match(/^(?:sửa|sua|\/sua)\s+(.+?)\s+(tên|ten|giá|gia)\s+(.+)$/i);
+  if (editMatch) {
+    return {
+      type: "edit",
+      target: normalizeName(editMatch[1]),
+      field: editMatch[2].toLowerCase(),
+      value: editMatch[3].trim(),
+    };
+  }
+
+  // ghi chú #3 xe đẹp, khách quen
+  const noteMatch = text.match(/^(?:ghi chú|ghi chu|note)\s+#?(\d+)\s+(.+)$/i);
+  if (noteMatch) {
+    return { type: "note", target: noteMatch[1], note: noteMatch[2].trim() };
+  }
+
+  // sắp bán | sắp bán 6 (trong vòng 6 giờ tới)
+  const nearMatch = text.match(/^(?:sắp bán|sap ban|near)(?:\s+(\d+))?$/i);
+  if (nearMatch) {
+    return { type: "near", hours: nearMatch[1] ? Number(nearMatch[1]) : 48 };
+  }
+
   return {
     type: "unknown",
     reason:
@@ -363,13 +385,11 @@ export function handleCommand(input: string): ChatReply {
     case "find":
       return { ok: true, reply: vehicleDetail(cmd.name) };
     case "edit":
-      return { ok: false, reply: "Tính năng sửa đang phát triển." };
+      return doEdit(cmd.target, cmd.field, cmd.value);
     case "note":
-      return { ok: false, reply: "Tính năng ghi chú đang phát triển." };
+      return doNote(cmd.target, cmd.note);
     case "near":
-      return { ok: false, reply: "Tính năng sắp bán đang phát triển." };
-    case "profit":
-      return { ok: false, reply: "Tính năng lãi theo ngày đang phát triển." };
+      return { ok: true, reply: nearSellable(cmd.hours) };
     case "unknown":
       return { ok: false, reply: cmd.reason };
     default:
@@ -385,14 +405,85 @@ function helpText() {
     "• `bán [xe] [giá]` — bán sau 48h, BẮT BUỘC có giá thực tế: `bán GTR 13.5m`",
     "• `xóa #1` / `xóa GTR` — xóa 1 xe · `xóa hết xác nhận` — xóa cả kho",
     "",
+    "**Sửa / ghi chú**",
+    "• `sửa #1 tên GTR-R35` / `sửa GTR giá 12m` — sửa tên hoặc giá nhập",
+    "• `ghi chú #1 xe đẹp, khách quen` — cập nhật ghi chú (thay thế ghi chú cũ)",
+    "",
     "**Xem**",
     "• `kho` — chỉ xe còn hàng + đã cọc (dạng bảng bên phải)",
+    "• `sắp bán` hoặc `sắp bán 6` — xe chưa đủ 48h, sắp tới hạn bán được",
     "• `tong hop 15/7` hoặc `ngày 15-7-2026` — chỉ ngày đó (gồm xe đã bán)",
     "• `tổng` — tổng hợp toàn bộ + xe đã bán",
     "• `tìm GTR` — xem chi tiết xe",
     "",
     "**Giá** `10m`/`10tr`/`6,5tr`/`100k`",
   ].join("\n");
+}
+
+function doEdit(target: string, field: string, value: string): ChatReply {
+  const { vehicle, error } = pickVehicle(target);
+  if (!vehicle) return { ok: false, reply: error! };
+
+  const db = getDb();
+  const ts = nowIso();
+
+  if (/^t[êe]n$/i.test(field)) {
+    const newName = normalizeName(value);
+    if (!newName) return { ok: false, reply: "Tên xe không được để trống." };
+    db.prepare(`UPDATE vehicles SET name = ?, updated_at = ? WHERE id = ?`).run(newName, ts, vehicle.id);
+    return {
+      ok: true,
+      refresh: true,
+      reply: `✏️ Đã đổi tên xe #${vehicle.id}: **${vehicle.name}** → **${newName}**`,
+    };
+  }
+
+  if (/^gi[áa]$/i.test(field)) {
+    const price = parseMoney(value);
+    if (!price || price <= 0) return { ok: false, reply: `Giá không hợp lệ: "${value}"` };
+    const expected = expectedSellPrice(price);
+    db.prepare(
+      `UPDATE vehicles SET purchase_price = ?, expected_price = ?, updated_at = ? WHERE id = ?`,
+    ).run(price, expected, ts, vehicle.id);
+    return {
+      ok: true,
+      refresh: true,
+      reply: `✏️ Đã sửa giá nhập **${vehicle.name}** (#${vehicle.id}): ${formatMoney(vehicle.purchase_price)} → ${formatMoney(price)}`,
+    };
+  }
+
+  return { ok: false, reply: `Không hỗ trợ sửa trường "${field}". Dùng: tên hoặc giá.` };
+}
+
+function doNote(target: string, note: string): ChatReply {
+  const { vehicle, error } = pickVehicle(target);
+  if (!vehicle) return { ok: false, reply: error! };
+  if (!note.trim()) return { ok: false, reply: "Ghi chú không được để trống." };
+
+  getDb()
+    .prepare(`UPDATE vehicles SET note = ?, updated_at = ? WHERE id = ?`)
+    .run(note.trim(), nowIso(), vehicle.id);
+
+  return {
+    ok: true,
+    refresh: true,
+    reply: `📝 Đã cập nhật ghi chú **${vehicle.name}** (#${vehicle.id}): ${note.trim()}`,
+  };
+}
+
+function nearSellable(hours: number): string {
+  const active = getActiveVehicles().filter(
+    (v) => v.status !== "Đã bán hết" && !canSell(v.imported_at, nowIso()),
+  );
+  const upcoming = active
+    .map((v) => ({ v, ...hoursUntilSellable(v.imported_at) }))
+    .filter((x) => x.h < hours)
+    .sort((a, b) => a.h * 60 + a.m - (b.h * 60 + b.m));
+
+  if (!upcoming.length) return `Không có xe nào sắp bán được trong ${hours} giờ tới.`;
+
+  const lines = upcoming.map(({ v, h, m }) => `• #${v.id} ${v.name}: còn ${h} giờ ${m} phút`);
+  return [`⏳ **Xe sắp bán được** (trong ${hours} giờ tới)`, ...lines].join("\n");
 }
 
 function doImport(name: string, price: number, at: string, note?: string): ChatReply {
