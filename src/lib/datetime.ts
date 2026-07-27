@@ -18,6 +18,15 @@ export function toLocalDateKey(iso: string): string {
   });
 }
 
+export function toLocalMonthKey(iso: string): string {
+  return toLocalDateKey(iso).slice(0, 7);
+}
+
+export function formatMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-");
+  return `Tháng ${Number(m)}/${y}`;
+}
+
 export function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("vi-VN", {

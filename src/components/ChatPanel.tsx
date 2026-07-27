@@ -35,6 +35,9 @@ interface SellForm {
   price: string;
   customerName: string;
   note: string;
+  useCustomTime: boolean;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm
 }
 
 interface CancelDepositForm {
@@ -385,6 +388,55 @@ function CommandForm({
             />
             <Field label="Tên khách mua" value={form.customerName} onChange={(v) => onChange({ ...form, customerName: v })} placeholder="Nguyễn Văn A (để trống nếu giữ khách đã cọc)" />
             <Field label="Giá bán thực tế" value={form.price} onChange={(v) => onChange({ ...form, price: v })} placeholder="13.5m · 9tr · 7m" hint="Xe phải đủ 48 giờ từ lúc nhập" required />
+
+            {/* Optional datetime — cho phép chỉnh giờ bán nếu cần bán trước 48h */}
+            <div className="flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)]/40 p-3">
+              <label className="flex cursor-pointer items-center gap-2.5 select-none">
+                <span
+                  role="checkbox"
+                  aria-checked={form.useCustomTime}
+                  onClick={() => {
+                    const next = !form.useCustomTime;
+                    onChange({ ...form, useCustomTime: next, date: next ? todayDate() : form.date, time: next ? nowTime() : form.time });
+                  }}
+                  className={`flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border-2 transition ${
+                    form.useCustomTime ? "border-[var(--accent)] bg-[var(--accent)]" : "border-[var(--muted)]"
+                  }`}
+                >
+                  {form.useCustomTime && (
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 4l2 2 4-4"/>
+                    </svg>
+                  )}
+                </span>
+                <span className="text-[12px] text-[var(--ink-soft)]">Điền thời gian bán thủ công</span>
+                <span className="text-[10px] text-[var(--muted)]">(vd: bán trước 48h do ghi giờ nhập trễ)</span>
+              </label>
+
+              {form.useCustomTime && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">Ngày</label>
+                    <input
+                      type="date"
+                      value={form.date}
+                      onChange={(e) => onChange({ ...form, date: e.target.value })}
+                      className="rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)] transition [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">Giờ</label>
+                    <input
+                      type="time"
+                      value={form.time}
+                      onChange={(e) => onChange({ ...form, time: e.target.value })}
+                      className="rounded-lg border border-[var(--line)] bg-[var(--field)] px-3 py-2 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)] transition [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <NoteField value={form.note} onChange={(v) => onChange({ ...form, note: v })} />
           </>
         )}
@@ -530,7 +582,7 @@ export function ChatPanel({ onRefresh }: ChatPanelProps) {
       setForm({ kind, vehicleId: "", deposit: "", agreedPrice: "", customerName: "", note: "" });
     } else if (kind === "sell") {
       fetchVehicles();
-      setForm({ kind, vehicleId: "", price: "", customerName: "", note: "" });
+      setForm({ kind, vehicleId: "", price: "", customerName: "", note: "", useCustomTime: false, date: todayDate(), time: nowTime() });
     } else {
       fetchVehicles();
       setForm({ kind: "cancel_deposit", vehicleId: "", refund: "", note: "" });
@@ -580,8 +632,9 @@ export function ChatPanel({ onRefresh }: ChatPanelProps) {
       displayMsg = `🟡 Đặt cọc: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · khách ${form.customerName} · cọc ${form.deposit} · bán ${form.agreedPrice}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
     } else if (form.kind === "sell") {
       const v = vehicles.find((x) => String(x.id) === form.vehicleId);
-      payload = { action: "sell", vehicleId: Number(form.vehicleId), price: form.price, customerName: form.customerName || undefined, note: form.note || undefined };
-      displayMsg = `💰 Bán xe: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · ${form.price}${form.customerName ? ` · khách ${form.customerName}` : ""}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
+      const at = form.useCustomTime ? buildVnAt(form.date, form.time) : undefined;
+      payload = { action: "sell", vehicleId: Number(form.vehicleId), price: form.price, customerName: form.customerName || undefined, note: form.note || undefined, at };
+      displayMsg = `💰 Bán xe: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · ${form.price}${form.customerName ? ` · khách ${form.customerName}` : ""}${form.note ? ` · ghi chú: ${form.note}` : ""}${form.useCustomTime ? ` · ${form.date} ${form.time}` : ""}`;
     } else {
       const v = vehicles.find((x) => String(x.id) === form.vehicleId);
       payload = { action: "cancel_deposit", vehicleId: Number(form.vehicleId), refund: form.refund || "0", note: form.note || undefined };

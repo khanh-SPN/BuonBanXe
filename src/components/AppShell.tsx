@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatPanel } from "@/components/ChatPanel";
 import { SidePanel } from "@/components/SidePanel";
+import { StatsReport } from "@/components/StatsReport";
 import type { StatsPayload } from "@/lib/format";
 
 export function AppShell() {
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"chat" | "inventory">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "inventory" | "stats">("chat");
 
   const refresh = useCallback(async () => {
     try {
@@ -24,9 +25,9 @@ export function AppShell() {
     refresh();
   }, [refresh]);
 
-  // Refresh stats khi switch sang tab inventory
+  // Refresh stats khi switch sang tab inventory / thống kê
   useEffect(() => {
-    if (activeTab === "inventory") {
+    if (activeTab === "inventory" || activeTab === "stats") {
       refresh();
     }
   }, [activeTab, refresh]);
@@ -73,6 +74,17 @@ export function AppShell() {
               >
                 Bảng kho
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("stats")}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                  activeTab === "stats"
+                    ? "bg-[var(--accent)] text-[var(--accent-ink)]"
+                    : "text-[var(--muted)] hover:text-[var(--ink)]"
+                }`}
+              >
+                Thống kê
+              </button>
             </div>
             <button
               type="button"
@@ -90,9 +102,13 @@ export function AppShell() {
           <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm animate-rise">
             <ChatPanel onRefresh={refresh} />
           </div>
-        ) : (
+        ) : activeTab === "inventory" ? (
           <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-sm animate-rise">
             <SidePanel stats={stats} loading={loading} />
+          </div>
+        ) : (
+          <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-sm animate-rise">
+            <StatsReport stats={stats} loading={loading} />
           </div>
         )}
       </main>

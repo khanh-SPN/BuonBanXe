@@ -31,6 +31,16 @@ export interface Vehicle {
   sold_at: string | null;
 }
 
+export interface PeriodStat {
+  key: string;
+  label: string;
+  importedCount: number;
+  importCost: number;
+  soldCount: number;
+  revenue: number;
+  profit: number;
+}
+
 export interface StatsPayload {
   counts: {
     total: number;
@@ -55,4 +65,6 @@ export interface StatsPayload {
   vehicles: Vehicle[];
   /** Chỉ hiện khi tổng hợp */
   soldVehicles: Vehicle[];
+  daily: PeriodStat[];
+  monthly: PeriodStat[];
 }

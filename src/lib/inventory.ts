@@ -8,10 +8,12 @@ import { getDb, type Vehicle, type VehicleStatus } from "./db";
 import {
   formatDate,
   formatDateTime,
+  formatMonthLabel,
   nowIso,
   parseViDate,
   peelDateTime,
   toLocalDateKey,
+  toLocalMonthKey,
   todayKey,
 } from "./datetime";
 
@@ -567,7 +569,7 @@ export function handleAction(body: ActionPayload): ChatReply {
     if (!vehicle) return { ok: false, reply: `Không tìm thấy xe #${id}.` };
     const price = parseMoney(body.price ?? "");
     if (!price || price <= 0) return { ok: false, reply: `Giá bán không hợp lệ: "${body.price}"` };
-    return doSellOnVehicle(vehicle, price, nowIso(), body.note?.trim() || undefined, body.customerName);
+    return doSellOnVehicle(vehicle, price, body.at ?? nowIso(), body.note?.trim() || undefined, body.customerName);
   }
 
   if (body.action === "cancel_deposit") {
@@ -724,6 +726,64 @@ export function getSoldVehicles(): Vehicle[] {
     .all() as Vehicle[];
 }
 
+export interface PeriodStat {
+  key: string;
+  label: string;
+  importedCount: number;
+  importCost: number;
+  soldCount: number;
+  revenue: number;
+  profit: number;
+}
+
+function buildPeriodStats(
+  vehicles: Vehicle[],
+  keyOf: (iso: string) => string,
+  labelOf: (key: string) => string,
+  limit: number,
+): PeriodStat[] {
+  const map = new Map<string, PeriodStat>();
+
+  function ensure(key: string): PeriodStat {
+    let row = map.get(key);
+    if (!row) {
+      row = { key, label: labelOf(key), importedCount: 0, importCost: 0, soldCount: 0, revenue: 0, profit: 0 };
+      map.set(key, row);
+    }
+    return row;
+  }
+
+  for (const v of vehicles) {
+    const importRow = ensure(keyOf(v.imported_at));
+    importRow.importedCount += 1;
+    importRow.importCost += v.purchase_price;
+
+    if (v.sold_at) {
+      const soldRow = ensure(keyOf(v.sold_at));
+      soldRow.soldCount += 1;
+      soldRow.revenue += v.actual_price ?? 0;
+      soldRow.profit += v.profit ?? 0;
+    }
+  }
+
+  return Array.from(map.values())
+    .sort((a, b) => (a.key < b.key ? 1 : -1))
+    .slice(0, limit);
+}
+
+export function getDailyStats(limit = 30): PeriodStat[] {
+  return buildPeriodStats(
+    getAllVehicles(),
+    toLocalDateKey,
+    (key) => formatDate(`${key}T12:00:00+07:00`),
+    limit,
+  );
+}
+
+export function getMonthlyStats(limit = 12): PeriodStat[] {
+  return buildPeriodStats(getAllVehicles(), toLocalMonthKey, formatMonthLabel, limit);
+}
+
 export function getStats() {
   const vehicles = getAllVehicles();
   const active = getActiveVehicles();
@@ -767,6 +827,8 @@ export function getStats() {
     },
     vehicles: active,
     soldVehicles: sold,
+    daily: getDailyStats(),
+    monthly: getMonthlyStats(),
   };
 }
 
