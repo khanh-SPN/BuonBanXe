@@ -44,7 +44,8 @@ function NoteCell({ note }: { note: string | null | undefined }) {
 
   if (!note) return <span className="text-[var(--muted)]">—</span>;
 
-  const short = note.length > 28 ? note.slice(0, 28) + "…" : note;
+  const isLong = note.length > 42;
+  const short = isLong ? note.slice(0, 42) + "…" : note;
 
   return (
     <div className="relative">
@@ -52,13 +53,13 @@ function NoteCell({ note }: { note: string | null | undefined }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-xs transition hover:bg-white/5 ${
-          open ? "text-[var(--accent)]" : "text-[var(--ink-soft)]"
+          open ? "text-[var(--accent)]" : "text-[var(--ink)]"
         }`}
         title={note}
       >
         <span className="shrink-0 text-[10px] opacity-60">📝</span>
-        <span className="max-w-[120px] truncate">{short}</span>
-        {note.length > 28 && (
+        <span className="max-w-[190px] truncate">{short}</span>
+        {isLong && (
           <svg
             width="10" height="10" viewBox="0 0 10 10" fill="currentColor"
             className={`shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
@@ -67,13 +68,23 @@ function NoteCell({ note }: { note: string | null | undefined }) {
           </svg>
         )}
       </button>
-      {open && note.length > 28 && (
+      {open && isLong && (
         <div className="absolute bottom-full left-0 z-50 mb-1 w-64 rounded-xl border border-[var(--line)] bg-[var(--chip)] p-3 shadow-xl">
           <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--muted)]">Ghi chú đầy đủ</p>
           <p className="text-xs leading-relaxed text-[var(--ink-soft)]">{note}</p>
         </div>
       )}
     </div>
+  );
+}
+
+function CustomerCell({ name }: { name: string | null | undefined }) {
+  if (!name) return <span className="text-[var(--muted)]">—</span>;
+  return (
+    <span className="flex items-center gap-1 text-[13px] font-medium text-[var(--ink)]">
+      <span className="text-[10px] opacity-60">👤</span>
+      {name}
+    </span>
   );
 }
 
@@ -110,7 +121,7 @@ function SummaryTable({
 }) {
   const [showPrices, setShowPrices] = useState(false);
 
-  const colCount = mode === "active" ? 11 : 7;
+  const colCount = mode === "active" ? 12 : 8;
 
   return (
     <div className="sheet">
@@ -144,6 +155,7 @@ function SummaryTable({
                   <th>Tiền cọc</th>
                   <th>Còn TT</th>
                   <th>Trạng thái</th>
+                  <th>Khách</th>
                   <th>Ngày nhập</th>
                   <th>Ngày cọc</th>
                   <th>Ghi chú</th>
@@ -152,6 +164,7 @@ function SummaryTable({
                 <>
                   <th>Giá bán</th>
                   <th>Lãi thực</th>
+                  <th>Khách</th>
                   <th>Ngày bán</th>
                   <th>Ghi chú</th>
                 </>
@@ -195,6 +208,7 @@ function SummaryTable({
                         <td>{moneyCell(v.deposit_amount, "warn")}</td>
                         <td>{moneyCell(remainPay(v))}</td>
                         <td><StatusPill status={v.status} /></td>
+                        <td><CustomerCell name={v.customer_name} /></td>
                         <td className="nowrap text-[11px] text-[var(--muted)]">{formatDateTime(v.imported_at)}</td>
                         <td className="nowrap text-[11px] text-[var(--muted)]">{formatDateTime(v.deposit_at)}</td>
                         <td><NoteCell note={v.note} /></td>
@@ -203,6 +217,7 @@ function SummaryTable({
                       <>
                         <td>{moneyCell(v.actual_price)}</td>
                         <td>{moneyCell(v.profit, (v.profit ?? 0) >= 0 ? "good" : "bad")}</td>
+                        <td><CustomerCell name={v.customer_name} /></td>
                         <td className="nowrap text-[11px] text-[var(--muted)]">{formatDateTime(v.sold_at)}</td>
                         <td><NoteCell note={v.note} /></td>
                       </>

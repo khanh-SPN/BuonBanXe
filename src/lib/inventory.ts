@@ -37,6 +37,7 @@ export interface ActionPayload {
   // cancel deposit
   refund?: string;
   // shared
+  customerName?: string;
   note?: string;
 }
 
@@ -427,6 +428,7 @@ function doDepositOnVehicle(
   agreedPrice: number,
   at: string,
   userNote?: string,
+  customerName?: string,
 ): ChatReply {
   if (vehicle.status === "Đã bán hết") {
     return { ok: false, reply: `Xe **${vehicle.name}** đã bán hết, không thể nhận cọc.` };
@@ -446,16 +448,18 @@ function doDepositOnVehicle(
          deposit_amount = ?,
          agreed_price = ?,
          deposit_at = ?,
+         customer_name = ?,
          note = ?,
          updated_at = ?
      WHERE id = ?`,
-  ).run(amount, agreedPrice, at, noteParts || null, ts, vehicle.id);
+  ).run(amount, agreedPrice, at, customerName?.trim() || null, noteParts || null, ts, vehicle.id);
 
   return {
     ok: true,
     refresh: true,
     reply: [
       `🟡 Đã nhận cọc **${vehicle.name}** (#${vehicle.id})`,
+      ...(customerName?.trim() ? [`• Khách cọc: ${customerName.trim()}`] : []),
       `• Tiền cọc: ${formatMoney(amount)}`,
       `• Giá bán ra: ${formatMoney(agreedPrice)}`,
       `• Còn thanh toán: ${formatMoney(remain)}`,
@@ -465,7 +469,13 @@ function doDepositOnVehicle(
   };
 }
 
-function doSellOnVehicle(vehicle: Vehicle, price: number, at: string, userNote?: string): ChatReply {
+function doSellOnVehicle(
+  vehicle: Vehicle,
+  price: number,
+  at: string,
+  userNote?: string,
+  customerName?: string,
+): ChatReply {
   if (vehicle.status === "Đã bán hết") {
     return { ok: false, reply: `Xe **${vehicle.name}** đã bán rồi.` };
   }
@@ -489,6 +499,7 @@ function doSellOnVehicle(vehicle: Vehicle, price: number, at: string, userNote?:
   const tax = Math.round(price * 0.05);
   const paidMore = vehicle.deposit_amount != null ? Math.max(0, price - vehicle.deposit_amount) : null;
   const newNote = [vehicle.note, userNote].filter(Boolean).join(" ; ");
+  const finalCustomer = customerName?.trim() || vehicle.customer_name;
 
   db.prepare(
     `UPDATE vehicles
@@ -497,25 +508,23 @@ function doSellOnVehicle(vehicle: Vehicle, price: number, at: string, userNote?:
          agreed_price = COALESCE(agreed_price, ?),
          profit = ?,
          sold_at = ?,
+         customer_name = ?,
          note = ?,
          updated_at = ?
      WHERE id = ?`,
-  ).run(price, price, profit, at, newNote || null, ts, vehicle.id);
+  ).run(price, price, profit, at, finalCustomer || null, newNote || null, ts, vehicle.id);
 
-  const lines = [
-    `🟢 Đã bán **${vehicle.name}** (#${vehicle.id})`,
-    `• Giá nhập: ${formatMoney(vehicle.purchase_price)}`,
-    `• Giá bán: ${formatMoney(price)}`,
-    `• Thuế 5%: ${formatMoney(tax)}`,
-    `• Lãi thực: ${formatMoney(profit)}`,
-    `• Ngày bán: ${formatDateTime(at)}`,
-  ];
+  const lines = [`🟢 Đã bán **${vehicle.name}** (#${vehicle.id})`];
+  if (finalCustomer) lines.push(`• Khách mua: ${finalCustomer}`);
+  lines.push(`• Giá nhập: ${formatMoney(vehicle.purchase_price)}`);
+  lines.push(`• Giá bán: ${formatMoney(price)}`);
   if (vehicle.deposit_amount != null) {
-    lines.splice(3, 0,
-      `• Đã cọc: ${formatMoney(vehicle.deposit_amount)}`,
-      `• Thu thêm khi bán: ${formatMoney(paidMore ?? 0)}`,
-    );
+    lines.push(`• Đã cọc: ${formatMoney(vehicle.deposit_amount)}`);
+    lines.push(`• Thu thêm khi bán: ${formatMoney(paidMore ?? 0)}`);
   }
+  lines.push(`• Thuế 5%: ${formatMoney(tax)}`);
+  lines.push(`• Lãi thực: ${formatMoney(profit)}`);
+  lines.push(`• Ngày bán: ${formatDateTime(at)}`);
   if (userNote) lines.push(`• Ghi chú: ${userNote}`);
   return { ok: true, refresh: true, reply: lines.join("\n") };
 }
@@ -542,12 +551,13 @@ export function handleAction(body: ActionPayload): ChatReply {
     if (!id) return { ok: false, reply: "Thiếu xe." };
     const vehicle = getDb().prepare(`SELECT * FROM vehicles WHERE id = ?`).get(id) as Vehicle | undefined;
     if (!vehicle) return { ok: false, reply: `Không tìm thấy xe #${id}.` };
+    if (!body.customerName?.trim()) return { ok: false, reply: "Thiếu tên khách đặt cọc." };
     const amount = parseMoney(body.deposit ?? "");
     const agreedPrice = parseMoney(body.agreedPrice ?? "");
     if (!amount || amount <= 0) return { ok: false, reply: `Tiền cọc không hợp lệ: "${body.deposit}"` };
     if (!agreedPrice || agreedPrice <= 0) return { ok: false, reply: `Giá bán ra không hợp lệ: "${body.agreedPrice}"` };
     if (agreedPrice < amount) return { ok: false, reply: "Giá bán ra phải lớn hơn hoặc bằng tiền cọc." };
-    return doDepositOnVehicle(vehicle, amount, agreedPrice, nowIso(), body.note?.trim() || undefined);
+    return doDepositOnVehicle(vehicle, amount, agreedPrice, nowIso(), body.note?.trim() || undefined, body.customerName);
   }
 
   if (body.action === "sell") {
@@ -557,7 +567,7 @@ export function handleAction(body: ActionPayload): ChatReply {
     if (!vehicle) return { ok: false, reply: `Không tìm thấy xe #${id}.` };
     const price = parseMoney(body.price ?? "");
     if (!price || price <= 0) return { ok: false, reply: `Giá bán không hợp lệ: "${body.price}"` };
-    return doSellOnVehicle(vehicle, price, nowIso(), body.note?.trim() || undefined);
+    return doSellOnVehicle(vehicle, price, nowIso(), body.note?.trim() || undefined, body.customerName);
   }
 
   if (body.action === "cancel_deposit") {
@@ -590,6 +600,7 @@ function doRefundDeposit(vehicle: Vehicle, refund: number, userNote?: string): C
          deposit_amount = NULL,
          agreed_price = NULL,
          deposit_at = NULL,
+         customer_name = NULL,
          note = ?,
          updated_at = ?
      WHERE id = ?`,
@@ -653,6 +664,7 @@ function listVehicles(filter: "active" | "deposit" | "stock"): string {
     if (v.deposit_amount != null) bits.push(`cọc ${formatMoney(v.deposit_amount)}`);
     if (v.agreed_price != null) bits.push(`bán ra ${formatMoney(v.agreed_price)}`);
     if (remain != null) bits.push(`còn TT ${formatMoney(remain)}`);
+    if (v.customer_name) bits.push(`khách ${v.customer_name}`);
     return bits.join(" · ");
   });
 
@@ -670,6 +682,7 @@ function vehicleDetail(name: string): string {
 
   return [
     `**${vehicle.name}** (#${vehicle.id}) — ${vehicle.status}`,
+    `• Khách: ${vehicle.customer_name || "—"}`,
     `• Giá nhập: ${formatMoney(vehicle.purchase_price)}`,
     `• Giá dự kiến (+35%): ${formatMoney(vehicle.expected_price)}`,
     `• Giá bán ra: ${vehicle.agreed_price != null ? formatMoney(vehicle.agreed_price) : "—"}`,

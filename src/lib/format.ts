@@ -22,6 +22,7 @@ export interface Vehicle {
   agreed_price: number | null;
   actual_price: number | null;
   status: VehicleStatus;
+  customer_name: string | null;
   note: string | null;
   profit: number | null;
   deposit_amount: number | null;

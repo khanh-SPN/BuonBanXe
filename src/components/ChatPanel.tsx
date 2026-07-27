@@ -25,6 +25,7 @@ interface DepositForm {
   vehicleId: string;
   deposit: string;
   agreedPrice: string;
+  customerName: string;
   note: string;
 }
 
@@ -32,6 +33,7 @@ interface SellForm {
   kind: "sell";
   vehicleId: string;
   price: string;
+  customerName: string;
   note: string;
 }
 
@@ -208,6 +210,9 @@ function VehicleSelect({
                 <span className="flex-1 min-w-0">
                   <span className="font-semibold text-[var(--ink)]">#{v.id} {v.name}</span>
                   <span className={`ml-2 text-[11px] ${statusColor}`}>{v.status}</span>
+                  {v.customer_name && (
+                    <span className="ml-2 text-[11px] text-[var(--muted)]">👤 {v.customer_name}</span>
+                  )}
                 </span>
                 <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
                   nhập {(v.purchase_price / 1_000_000).toLocaleString("vi", { maximumFractionDigits: 1 })}m
@@ -244,7 +249,7 @@ function CommandForm({
     form.kind === "import"
       ? !!form.name.trim() && !!form.price.trim()
       : form.kind === "deposit"
-        ? !!form.vehicleId && !!form.deposit.trim() && !!form.agreedPrice.trim()
+        ? !!form.vehicleId && !!form.deposit.trim() && !!form.agreedPrice.trim() && !!form.customerName.trim()
         : form.kind === "sell"
           ? !!form.vehicleId && !!form.price.trim()
           : !!form.vehicleId; // cancel_deposit: only need vehicle
@@ -352,6 +357,7 @@ function CommandForm({
               loading={vehiclesLoading}
               forDeposit
             />
+            <Field label="Tên khách đặt cọc" value={form.customerName} onChange={(v) => onChange({ ...form, customerName: v })} placeholder="Nguyễn Văn A" required />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Tiền cọc" value={form.deposit} onChange={(v) => onChange({ ...form, deposit: v })} placeholder="100k · 500k · 1m" required />
               <Field label="Giá bán ra" value={form.agreedPrice} onChange={(v) => onChange({ ...form, agreedPrice: v })} placeholder="6.5m · 12tr" required />
@@ -371,9 +377,13 @@ function CommandForm({
             <VehicleSelect
               vehicles={vehicles}
               value={form.vehicleId}
-              onChange={(id) => onChange({ ...form, vehicleId: id })}
+              onChange={(id) => {
+                const v = vehicles.find((x) => String(x.id) === id);
+                onChange({ ...form, vehicleId: id, customerName: v?.customer_name || form.customerName });
+              }}
               loading={vehiclesLoading}
             />
+            <Field label="Tên khách mua" value={form.customerName} onChange={(v) => onChange({ ...form, customerName: v })} placeholder="Nguyễn Văn A (để trống nếu giữ khách đã cọc)" />
             <Field label="Giá bán thực tế" value={form.price} onChange={(v) => onChange({ ...form, price: v })} placeholder="13.5m · 9tr · 7m" hint="Xe phải đủ 48 giờ từ lúc nhập" required />
             <NoteField value={form.note} onChange={(v) => onChange({ ...form, note: v })} />
           </>
@@ -517,10 +527,10 @@ export function ChatPanel({ onRefresh }: ChatPanelProps) {
       setForm({ kind, name: "", price: "", note: "", useCustomTime: false, date: todayDate(), time: nowTime() });
     } else if (kind === "deposit") {
       fetchVehicles();
-      setForm({ kind, vehicleId: "", deposit: "", agreedPrice: "", note: "" });
+      setForm({ kind, vehicleId: "", deposit: "", agreedPrice: "", customerName: "", note: "" });
     } else if (kind === "sell") {
       fetchVehicles();
-      setForm({ kind, vehicleId: "", price: "", note: "" });
+      setForm({ kind, vehicleId: "", price: "", customerName: "", note: "" });
     } else {
       fetchVehicles();
       setForm({ kind: "cancel_deposit", vehicleId: "", refund: "", note: "" });
@@ -566,12 +576,12 @@ export function ChatPanel({ onRefresh }: ChatPanelProps) {
       displayMsg = `📥 Nhập xe: **${form.name}** · ${form.price}${form.note ? ` · ghi chú: ${form.note}` : ""}${form.useCustomTime ? ` · ${form.date} ${form.time}` : ""}`;
     } else if (form.kind === "deposit") {
       const v = vehicles.find((x) => String(x.id) === form.vehicleId);
-      payload = { action: "deposit", vehicleId: Number(form.vehicleId), deposit: form.deposit, agreedPrice: form.agreedPrice, note: form.note || undefined };
-      displayMsg = `🟡 Đặt cọc: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · cọc ${form.deposit} · bán ${form.agreedPrice}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
+      payload = { action: "deposit", vehicleId: Number(form.vehicleId), deposit: form.deposit, agreedPrice: form.agreedPrice, customerName: form.customerName, note: form.note || undefined };
+      displayMsg = `🟡 Đặt cọc: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · khách ${form.customerName} · cọc ${form.deposit} · bán ${form.agreedPrice}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
     } else if (form.kind === "sell") {
       const v = vehicles.find((x) => String(x.id) === form.vehicleId);
-      payload = { action: "sell", vehicleId: Number(form.vehicleId), price: form.price, note: form.note || undefined };
-      displayMsg = `💰 Bán xe: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · ${form.price}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
+      payload = { action: "sell", vehicleId: Number(form.vehicleId), price: form.price, customerName: form.customerName || undefined, note: form.note || undefined };
+      displayMsg = `💰 Bán xe: **${v ? `#${v.id} ${v.name}` : `#${form.vehicleId}`}** · ${form.price}${form.customerName ? ` · khách ${form.customerName}` : ""}${form.note ? ` · ghi chú: ${form.note}` : ""}`;
     } else {
       const v = vehicles.find((x) => String(x.id) === form.vehicleId);
       payload = { action: "cancel_deposit", vehicleId: Number(form.vehicleId), refund: form.refund || "0", note: form.note || undefined };

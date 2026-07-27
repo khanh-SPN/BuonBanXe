@@ -12,6 +12,7 @@ export interface Vehicle {
   agreed_price: number | null;
   actual_price: number | null;
   status: VehicleStatus;
+  customer_name: string | null;
   note: string | null;
   profit: number | null;
   deposit_amount: number | null;
@@ -47,6 +48,7 @@ function ensureSchema(db: DatabaseSync) {
       agreed_price INTEGER,
       actual_price INTEGER,
       status TEXT NOT NULL DEFAULT 'Còn hàng',
+      customer_name TEXT,
       note TEXT,
       profit INTEGER,
       deposit_amount INTEGER,
@@ -72,6 +74,9 @@ function ensureSchema(db: DatabaseSync) {
 
   if (!columnExists(db, "vehicles", "agreed_price")) {
     db.exec(`ALTER TABLE vehicles ADD COLUMN agreed_price INTEGER`);
+  }
+  if (!columnExists(db, "vehicles", "customer_name")) {
+    db.exec(`ALTER TABLE vehicles ADD COLUMN customer_name TEXT`);
   }
 }
 
