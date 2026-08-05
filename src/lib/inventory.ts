@@ -1,8 +1,10 @@
 import {
+  TAX_LABEL,
   actualProfit,
   expectedSellPrice,
   formatMoney,
   parseMoney,
+  saleTax,
 } from "./money";
 import { getDb, type Vehicle, type VehicleStatus } from "./db";
 import {
@@ -589,7 +591,7 @@ function doSellOnVehicle(
   const profit = actualProfit(vehicle.purchase_price, price);
   const db = getDb();
   const ts = nowIso();
-  const tax = Math.round(price * 0.05);
+  const tax = saleTax(price);
   const paidMore = vehicle.deposit_amount != null ? Math.max(0, price - vehicle.deposit_amount) : null;
   const newNote = [vehicle.note, userNote].filter(Boolean).join(" ; ");
   const finalCustomer = customerName?.trim() || vehicle.customer_name;
@@ -615,7 +617,7 @@ function doSellOnVehicle(
     lines.push(`• Đã cọc: ${formatMoney(vehicle.deposit_amount)}`);
     lines.push(`• Thu thêm khi bán: ${formatMoney(paidMore ?? 0)}`);
   }
-  lines.push(`• Thuế 5%: ${formatMoney(tax)}`);
+  lines.push(`• Thuế ${TAX_LABEL}: ${formatMoney(tax)}`);
   lines.push(`• Lãi thực: ${formatMoney(profit)}`);
   lines.push(`• Ngày bán: ${formatDateTime(at)}`);
   if (userNote) lines.push(`• Ghi chú: ${userNote}`);

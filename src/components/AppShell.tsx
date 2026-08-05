@@ -5,6 +5,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { SidePanel } from "@/components/SidePanel";
 import { StatsReport } from "@/components/StatsReport";
 import type { StatsPayload } from "@/lib/format";
+import { TAX_LABEL } from "@/lib/money";
 
 export function AppShell() {
   const [stats, setStats] = useState<StatsPayload | null>(null);
@@ -47,7 +48,7 @@ export function AppShell() {
               Buôn Bán Xe
             </p>
             <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Chat lệnh · bảng kho · 48 giờ · thuế 5%
+              Chat lệnh · bảng kho · 48 giờ · thuế {TAX_LABEL}
             </p>
           </div>
           <div className="flex items-center gap-3">

@@ -46,11 +46,22 @@ export function formatMoney(amount: number): string {
   return amount < 0 ? `-${formatted} đ` : `${formatted} đ`;
 }
 
+/** Thuế bán xe. Đổi thuế suất chỉ cần sửa đúng dòng này. */
+export const TAX_RATE = 0.06;
+
+/** Nhãn hiển thị, ví dụ "6%" — luôn khớp với TAX_RATE. */
+export const TAX_LABEL = `${Math.round(TAX_RATE * 100)}%`;
+
 export function expectedSellPrice(purchasePrice: number): number {
   return Math.round(purchasePrice * 1.35);
 }
 
-/** Lãi thực = giá bán thực tế × 0.95 − giá nhập (trừ 5% thuế) */
+/** Tiền thuế phải nộp khi bán. */
+export function saleTax(sellPrice: number): number {
+  return Math.round(sellPrice * TAX_RATE);
+}
+
+/** Lãi thực = giá bán thực tế − thuế − giá nhập. */
 export function actualProfit(purchasePrice: number, sellPrice: number): number {
-  return Math.round(sellPrice * 0.95 - purchasePrice);
+  return Math.round(sellPrice * (1 - TAX_RATE) - purchasePrice);
 }
