@@ -55,6 +55,7 @@ export type ParsedCommand =
       at: string;
     }
   | { type: "sell"; name: string; price: number; at: string }
+  | { type: "unsell"; target: string }
   | { type: "delete"; target: string }
   | { type: "delete_all"; confirm: boolean }
   | { type: "list"; filter: "active" | "deposit" | "stock" }
@@ -293,6 +294,20 @@ export function parseCommand(input: string): ParsedCommand {
     };
   }
 
+  // hủy bán #46 | huy ban GTR | hoàn tác bán #46 (bấm bán nhầm)
+  const unsellMatch = text.match(
+    /^(?:hủy bán|huy ban|hủy ban|huy bán|hoàn tác|hoan tac|undo)(?:\s+(?:bán|ban))?\s+(.+)$/i,
+  );
+  if (unsellMatch) {
+    return { type: "unsell", target: normalizeName(unsellMatch[1]) };
+  }
+  if (/^(?:hủy bán|huy ban|hoàn tác|hoan tac|undo)$/i.test(text)) {
+    return {
+      type: "unknown",
+      reason: "Hoàn tác bán cần chỉ rõ xe. Ví dụ: `hủy bán #46` hoặc `hủy bán GTR`",
+    };
+  }
+
   // bán gtr 13.5m (bắt buộc có giá bán thực tế)
   const sellMatch = text.match(
     new RegExp(
@@ -374,6 +389,8 @@ export function handleCommand(input: string): ChatReply {
     }
     case "sell":
       return doSell(cmd.name, cmd.price, cmd.at);
+    case "unsell":
+      return doUnsell(cmd.target);
     case "delete":
       return doDelete(cmd.target);
     case "delete_all":
@@ -405,6 +422,7 @@ function helpText() {
     "• `nhập [xe] [giá]` — nhập kho (+35% dự kiến). Có thể thêm giờ: `nhập GTR 10m 18h31 15/7`",
     "• `/coc [xe] [cọc] [giá bán]` — ví dụ `/coc GTR 100k 6.5m` → còn thanh toán = giá bán − cọc",
     "• `bán [xe] [giá]` — bán sau 48h, BẮT BUỘC có giá thực tế: `bán GTR 13.5m`",
+    "• `hủy bán #46` — bấm bán nhầm thì hoàn tác, xe quay lại kho (hoặc về lại trạng thái đã cọc)",
     "• `xóa #1` / `xóa GTR` — xóa 1 xe · `xóa hết xác nhận` — xóa cả kho",
     "",
     "**Sửa / ghi chú**",
@@ -621,6 +639,58 @@ function doSellOnVehicle(
   lines.push(`• Lãi thực: ${formatMoney(profit)}`);
   lines.push(`• Ngày bán: ${formatDateTime(at)}`);
   if (userNote) lines.push(`• Ghi chú: ${userNote}`);
+  return { ok: true, refresh: true, reply: lines.join("\n") };
+}
+
+function doUnsell(target: string): ChatReply {
+  const { vehicle, error } = pickVehicle(target);
+  if (!vehicle) return { ok: false, reply: error! };
+
+  if (vehicle.status !== "Đã bán hết") {
+    return {
+      ok: false,
+      reply: `Xe **${vehicle.name}** (#${vehicle.id}) chưa bán — không có gì để hoàn tác.`,
+    };
+  }
+
+  // Có cọc trước đó → quay về "đã đặt cọc" và giữ nguyên cọc / giá bán ra / khách.
+  // Không có cọc → giá bán ra và tên khách là do lệnh bán ghi vào nên xóa luôn.
+  const hadDeposit = vehicle.deposit_amount != null && vehicle.deposit_at != null;
+  const soldPrice = vehicle.actual_price;
+  const soldProfit = vehicle.profit;
+
+  getDb()
+    .prepare(
+      `UPDATE vehicles
+       SET status = ?,
+           actual_price = NULL,
+           profit = NULL,
+           sold_at = NULL,
+           agreed_price = ?,
+           customer_name = ?,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+    .run(
+      hadDeposit ? "đã đặt cọc" : "Còn hàng",
+      hadDeposit ? vehicle.agreed_price : null,
+      hadDeposit ? vehicle.customer_name : null,
+      nowIso(),
+      vehicle.id,
+    );
+
+  const lines = [`↩️ Đã hoàn tác bán **${vehicle.name}** (#${vehicle.id})`];
+  if (soldPrice != null) lines.push(`• Hủy giá bán: ${formatMoney(soldPrice)}`);
+  if (soldProfit != null) lines.push(`• Trừ lại lãi đã tính: ${formatMoney(soldProfit)}`);
+  if (vehicle.sold_at) lines.push(`• Ngày bán đã xóa: ${formatDateTime(vehicle.sold_at)}`);
+  if (hadDeposit) {
+    lines.push(`• Trạng thái: đã đặt cọc (giữ cọc ${formatMoney(vehicle.deposit_amount!)})`);
+    if (vehicle.customer_name) lines.push(`• Khách cọc: ${vehicle.customer_name}`);
+  } else {
+    lines.push(`• Trạng thái: Còn hàng (quay lại kho)`);
+  }
+  lines.push(`• Ngày nhập giữ nguyên: ${formatDateTime(vehicle.imported_at)}`);
+
   return { ok: true, refresh: true, reply: lines.join("\n") };
 }
 
