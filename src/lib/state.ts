@@ -10,6 +10,14 @@ import {
 } from "./wallet";
 import type { AppState, VehicleImage } from "./types";
 
+/**
+ * node:sqlite trả về row với prototype null — React Server Component từ chối
+ * truyền loại object đó xuống client. Chuẩn hoá về object thường trước khi trả.
+ */
+function plain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 /** Một cú fetch duy nhất cho cả trang. */
 export function getState(): AppState {
   const stats = getVehicleStats();
@@ -22,7 +30,7 @@ export function getState(): AppState {
     (images[img.vehicle_id] ??= []).push(img);
   }
 
-  return {
+  return plain({
     rate: getRate(),
     wallet,
     today: { ...stats.today, ...flow },
@@ -36,5 +44,5 @@ export function getState(): AppState {
     igTrades: listIgTrades(200),
     daily: stats.daily,
     monthly: stats.monthly,
-  };
+  });
 }

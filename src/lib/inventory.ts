@@ -19,8 +19,7 @@ import {
   toLocalMonthKey,
   todayKey,
 } from "./datetime";
-
-const HOURS_48_MS = 48 * 60 * 60 * 1000;
+import { HOURS_48_MS } from "./sellable";
 
 export interface ActionResult {
   ok: boolean;

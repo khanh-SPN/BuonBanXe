@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { AppState } from "@/lib/types";
 import { formatIg, formatVnd, vndFromIg } from "@/lib/money";
 import type { Api, ApiResult } from "@/components/ui";
@@ -24,8 +24,8 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function AppShell() {
-  const [state, setState] = useState<AppState | null>(null);
+export function AppShell({ initialState }: { initialState: AppState }) {
+  const [state, setState] = useState<AppState>(initialState);
   const [tab, setTab] = useState<TabKey>("overview");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
@@ -35,14 +35,14 @@ export function AppShell() {
     if (res.ok) setState(await res.json());
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
   // Chỉ tải lại khi mở trang / đổi tab / sau mỗi thao tác — không tự động chạy nền.
-  useEffect(() => {
-    refresh();
-  }, [tab, refresh]);
+  const openTab = useCallback(
+    (next: TabKey) => {
+      setTab(next);
+      refresh();
+    },
+    [refresh],
+  );
 
   const notify = useCallback((message: string, ok = true) => {
     setToast({ message, ok });
@@ -71,15 +71,6 @@ export function AppShell() {
     },
     [notify, refresh],
   );
-
-  if (!state) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center gap-3 text-sm text-[var(--muted)]">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-        Đang tải dữ liệu…
-      </div>
-    );
-  }
 
   const api: Api = { state, busy, refresh, notify, send };
 
@@ -128,7 +119,7 @@ export function AppShell() {
               key={t.key}
               type="button"
               className={`tab-btn ${tab === t.key ? "on" : ""}`}
-              onClick={() => setTab(t.key)}
+              onClick={() => openTab(t.key)}
             >
               <span className="mr-1.5">{t.icon}</span>
               {t.label}
@@ -138,7 +129,7 @@ export function AppShell() {
       </header>
 
       <main className="relative z-10 mx-auto w-full max-w-[1500px] flex-1 p-3 sm:p-5">
-        {tab === "overview" && <Overview api={api} onJump={setTab} />}
+        {tab === "overview" && <Overview api={api} onJump={openTab} />}
         {tab === "vehicles" && <VehiclesTab api={api} />}
         {tab === "ig" && <IgTab api={api} />}
         {tab === "cash" && <CashTab api={api} />}

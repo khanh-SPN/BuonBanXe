@@ -16,7 +16,7 @@ const display = Sora({
 
 export const metadata: Metadata = {
   title: "Buôn Bán Xe",
-  description: "Chatbot quản lý kho xe — nhập, cọc, bán, lãi ngày",
+  description: "Quản lý kho xe, ví IG, mua bán IG, chi tiêu và nợ",
 };
 
 export default function RootLayout({

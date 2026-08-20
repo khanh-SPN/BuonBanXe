@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Vehicle } from "@/lib/types";
 import { EXPECTED_MARKUP, TAX_LABEL, formatIg, parseMoney, saleTax } from "@/lib/money";
 import { formatDateTime } from "@/lib/datetime";
+import { HOURS_48_MS, countdownText, msUntilSellable } from "@/lib/sellable";
 import {
   type Api,
   DateTimePicker,
@@ -20,13 +21,9 @@ import {
   todayDate,
 } from "@/components/ui";
 
-const HOURS_48_MS = 48 * 60 * 60 * 1000;
-
 function sellableIn(importedAt: string): { ready: boolean; text: string } {
-  const remain = new Date(importedAt).getTime() + HOURS_48_MS - Date.now();
-  if (remain <= 0) return { ready: true, text: "Bán được" };
-  const mins = Math.ceil(remain / 60000);
-  return { ready: false, text: `Còn ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}` };
+  const remain = msUntilSellable(importedAt);
+  return remain <= 0 ? { ready: true, text: "Bán được" } : { ready: false, text: countdownText(remain) };
 }
 
 type Filter = "all" | "stock" | "deposit" | "sold";

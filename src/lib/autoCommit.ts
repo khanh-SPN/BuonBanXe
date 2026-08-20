@@ -9,7 +9,7 @@ const INTERVAL_MS = 10 * 60 * 1000;
 const REPO_ROOT = process.cwd();
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __buonBanXeAutoCommitTimer: NodeJS.Timeout | undefined;
 }
 

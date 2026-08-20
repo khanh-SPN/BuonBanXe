@@ -17,7 +17,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "inventory.db");
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __buonBanXeDb: DatabaseSync | undefined;
 }
 
