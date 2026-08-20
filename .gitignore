@@ -47,3 +47,4 @@ next-env.d.ts
 
 # local claude settings (machine-specific)
 .claude/settings.local.json
+

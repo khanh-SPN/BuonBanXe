@@ -2,93 +2,16 @@ import fs from "fs";
 import path from "path";
 import { DatabaseSync } from "node:sqlite";
 
-export type VehicleStatus = "Còn hàng" | "đã đặt cọc" | "Đã bán hết";
-
-export interface Vehicle {
-  id: number;
-  name: string;
-  purchase_price: number;
-  expected_price: number;
-  agreed_price: number | null;
-  actual_price: number | null;
-  status: VehicleStatus;
-  customer_name: string | null;
-  note: string | null;
-  profit: number | null;
-  deposit_amount: number | null;
-  imported_at: string;
-  deposit_at: string | null;
-  sold_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-/** Mọi khoản tiền vào/ra đều là 1 dòng ở đây — ví IG và ví VND đều tính từ bảng này. */
-export type LedgerKind =
-  | "car_buy"
-  | "car_deposit"
-  | "car_deposit_refund"
-  | "car_sell"
-  | "car_tax"
-  | "expense"
-  | "income"
-  | "ig_buy"
-  | "ig_sell"
-  | "loan_out"
-  | "loan_collect"
-  | "borrow_in"
-  | "borrow_repay"
-  | "adjust";
-
-export type LedgerRefType = "vehicle" | "vehicle_sale" | "ig_trade" | "debt" | null;
-
-export interface LedgerEntry {
-  id: number;
-  at: string;
-  kind: LedgerKind;
-  category: string | null;
-  label: string;
-  ig_delta: number;
-  vnd_delta: number;
-  ref_type: LedgerRefType;
-  ref_id: number | null;
-  note: string | null;
-  created_at: string;
-}
-
-export interface IgTrade {
-  id: number;
-  side: "buy" | "sell";
-  rate: number;
-  vnd_amount: number;
-  ig_amount: number;
-  method: string | null;
-  counterparty: string | null;
-  note: string | null;
-  at: string;
-  created_at: string;
-}
-
-export interface Debt {
-  id: number;
-  direction: "cho_vay" | "di_vay";
-  person: string;
-  ig_amount: number;
-  paid_ig: number;
-  status: "đang nợ" | "xong";
-  note: string | null;
-  at: string;
-  settled_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface VehicleImage {
-  id: number;
-  vehicle_id: number;
-  path: string;
-  created_at: string;
-}
+export type {
+  Vehicle,
+  VehicleStatus,
+  VehicleImage,
+  LedgerEntry,
+  LedgerKind,
+  LedgerRefType,
+  IgTrade,
+  Debt,
+} from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "inventory.db");

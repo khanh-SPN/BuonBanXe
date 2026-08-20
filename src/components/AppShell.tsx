@@ -1,118 +1,153 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChatPanel } from "@/components/ChatPanel";
-import { SidePanel } from "@/components/SidePanel";
-import { StatsReport } from "@/components/StatsReport";
-import type { StatsPayload } from "@/lib/format";
-import { TAX_LABEL } from "@/lib/money";
+import type { AppState } from "@/lib/types";
+import { formatIg, formatVnd, vndFromIg } from "@/lib/money";
+import type { Api, ApiResult } from "@/components/ui";
+import { Overview } from "@/components/tabs/Overview";
+import { VehiclesTab } from "@/components/tabs/VehiclesTab";
+import { IgTab } from "@/components/tabs/IgTab";
+import { CashTab } from "@/components/tabs/CashTab";
+import { DebtsTab } from "@/components/tabs/DebtsTab";
+import { ReportTab } from "@/components/tabs/ReportTab";
+import { SettingsTab } from "@/components/tabs/SettingsTab";
+
+const TABS = [
+  { key: "overview", label: "Tổng quan", icon: "🏠" },
+  { key: "vehicles", label: "Kho xe", icon: "🚗" },
+  { key: "ig", label: "Mua bán IG", icon: "💱" },
+  { key: "cash", label: "Chi tiêu", icon: "🧾" },
+  { key: "debts", label: "Nợ", icon: "🤝" },
+  { key: "report", label: "Báo cáo", icon: "📊" },
+  { key: "settings", label: "Cài đặt", icon: "⚙️" },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
 
 export function AppShell() {
-  const [stats, setStats] = useState<StatsPayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"chat" | "inventory" | "stats">("chat");
+  const [state, setState] = useState<AppState | null>(null);
+  const [tab, setTab] = useState<TabKey>("overview");
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
 
   const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/stats");
-      if (!res.ok) return;
-      setStats(await res.json());
-    } finally {
-      setLoading(false);
-    }
+    const res = await fetch("/api/state");
+    if (res.ok) setState(await res.json());
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // Refresh stats khi switch sang tab inventory / thống kê
+  // Chỉ tải lại khi mở trang / đổi tab / sau mỗi thao tác — không tự động chạy nền.
   useEffect(() => {
-    if (activeTab === "inventory" || activeTab === "stats") {
-      refresh();
-    }
-  }, [activeTab, refresh]);
+    refresh();
+  }, [tab, refresh]);
+
+  const notify = useCallback((message: string, ok = true) => {
+    setToast({ message, ok });
+    window.setTimeout(() => setToast(null), 4200);
+  }, []);
+
+  const send = useCallback(
+    async (url: string, body: unknown): Promise<ApiResult> => {
+      setBusy(true);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = (await res.json()) as ApiResult;
+        notify(data.message ?? (data.ok ? "Xong." : "Có lỗi xảy ra."), data.ok);
+        if (data.ok) await refresh();
+        return data;
+      } catch {
+        notify("Không kết nối được server.", false);
+        return { ok: false, message: "Không kết nối được server." };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [notify, refresh],
+  );
+
+  if (!state) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center gap-3 text-sm text-[var(--muted)]">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+        Đang tải dữ liệu…
+      </div>
+    );
+  }
+
+  const api: Api = { state, busy, refresh, notify, send };
 
   return (
     <div className="relative flex min-h-dvh flex-col">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(196,112,45,0.22),transparent_68%)] blur-2xl" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(56,120,110,0.14),transparent_70%)] blur-2xl" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22%3E%3Cpath d=%22M0 60L60 0M30 60L60 30M0 30L30 0%22 stroke=%22rgba(255,255,255,0.03)%22 stroke-width=%221%22/%3E%3C/svg%3E')] opacity-80" />
       </div>
 
       <header className="relative z-10 border-b border-[var(--line)] px-4 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
-          <div>
-            <p className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-[var(--ink)] sm:text-3xl">
+        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
+          <div className="flex items-baseline gap-3">
+            <span className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-[var(--ink)]">
               Buôn Bán Xe
-            </p>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Chat lệnh · bảng kho · 48 giờ · thuế {TAX_LABEL}
-            </p>
+            </span>
+            <span className="text-xs text-[var(--muted)]">rate {state.rate}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1 rounded-lg border border-[var(--line)] bg-[var(--chip)] p-0.5">
-              <button
-                type="button"
-                onClick={() => setActiveTab("chat")}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                  activeTab === "chat"
-                    ? "bg-[var(--accent)] text-[var(--accent-ink)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-              >
-                Chat
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("inventory")}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                  activeTab === "inventory"
-                    ? "bg-[var(--accent)] text-[var(--accent-ink)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-              >
-                Bảng kho
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("stats")}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                  activeTab === "stats"
-                    ? "bg-[var(--accent)] text-[var(--accent-ink)]"
-                    : "text-[var(--muted)] hover:text-[var(--ink)]"
-                }`}
-              >
-                Thống kê
-              </button>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2">
+              <p className="eyebrow">Ví IG</p>
+              <p className={`tnum text-xl font-semibold ${state.wallet.ig < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
+                {formatIg(state.wallet.ig)}
+              </p>
+              <p className="text-[10.5px] text-[var(--muted)]">
+                ≈ {formatVnd(vndFromIg(state.wallet.ig, state.rate))} tiền thật
+              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => refresh()}
-              className="rounded-full border border-[var(--line)] bg-[var(--panel)] px-4 py-2 text-xs text-[var(--ink-soft)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-            >
-              Làm mới
+            <div className="rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2">
+              <p className="eyebrow">Ví tiền thật</p>
+              <p className={`tnum text-xl font-semibold ${state.wallet.vnd < 0 ? "text-[var(--bad)]" : "text-[var(--ink)]"}`}>
+                {formatVnd(state.wallet.vnd)}
+              </p>
+              <p className="text-[10.5px] text-[var(--muted)]">từ mua / bán IG</p>
+            </div>
+            <button type="button" className="btn" onClick={() => refresh()} disabled={busy}>
+              ↻ Làm mới
             </button>
           </div>
         </div>
+
+        <nav className="mx-auto mt-3 flex max-w-[1500px] gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`tab-btn ${tab === t.key ? "on" : ""}`}
+              onClick={() => setTab(t.key)}
+            >
+              <span className="mr-1.5">{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <main className="relative z-10 mx-auto w-full max-w-[1600px] flex-1 p-3 lg:p-5">
-        {activeTab === "chat" ? (
-          <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-sm animate-rise">
-            <ChatPanel onRefresh={refresh} />
-          </div>
-        ) : activeTab === "inventory" ? (
-          <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-sm animate-rise">
-            <SidePanel stats={stats} loading={loading} />
-          </div>
-        ) : (
-          <div className="h-[calc(100dvh-8rem)] overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panel)]/95 shadow-[0_20px_60px_rgba(0,0,0,0.28)] backdrop-blur-sm animate-rise">
-            <StatsReport stats={stats} loading={loading} />
-          </div>
-        )}
+      <main className="relative z-10 mx-auto w-full max-w-[1500px] flex-1 p-3 sm:p-5">
+        {tab === "overview" && <Overview api={api} onJump={setTab} />}
+        {tab === "vehicles" && <VehiclesTab api={api} />}
+        {tab === "ig" && <IgTab api={api} />}
+        {tab === "cash" && <CashTab api={api} />}
+        {tab === "debts" && <DebtsTab api={api} />}
+        {tab === "report" && <ReportTab api={api} />}
+        {tab === "settings" && <SettingsTab api={api} />}
       </main>
+
+      {toast && <div className={`toast ${toast.ok ? "ok" : "err"}`}>{toast.message}</div>}
     </div>
   );
 }
