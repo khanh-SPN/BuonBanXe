@@ -16,6 +16,7 @@ import {
   MoneyInput,
   PasteZone,
   StatusPill,
+  Thumb,
   buildAt,
   nowTime,
   todayDate,
@@ -163,8 +164,7 @@ function VehicleCard({
           title={images[0] ? "Xem ảnh" : "Thêm ảnh"}
         >
           {images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={images[0].path} alt={v.name} />
+            <Thumb src={images[0].path} alt={v.name} />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-[11px] text-[var(--muted)]">
               + Ảnh
@@ -316,14 +316,19 @@ function ImportModal({ api, onClose }: { api: Api; onClose: () => void }) {
         </div>
       )}
       <Field label="Ảnh xe" hint="Chụp bằng Win+Shift+S rồi bấm Ctrl+V — hoặc bấm vào ô để chọn file.">
-        <PasteZone onUploaded={(p) => setImages((prev) => [...prev, p])} notify={api.notify} />
+        <PasteZone
+          onUploaded={(p) => {
+            setImages((prev) => [...prev, p]);
+            api.notify("Đã thêm ảnh vào form.");
+          }}
+          notify={api.notify}
+        />
       </Field>
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map((p) => (
             <div key={p} className="thumb h-16 w-24">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p} alt="ảnh xe" />
+              <Thumb src={p} alt="ảnh xe" />
               <button
                 type="button"
                 className="absolute right-1 top-1 rounded bg-black/70 px-1.5 text-[11px] text-white"
@@ -625,8 +630,7 @@ function ImagesModal({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {images.map((img) => (
             <div key={img.id} className="thumb aspect-[4/3]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.path} alt={vehicle.name} onClick={() => onZoom(img.path)} className="cursor-zoom-in" />
+              <Thumb src={img.path} alt={vehicle.name} onClick={() => onZoom(img.path)} className="cursor-zoom-in" />
               <button
                 type="button"
                 className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] text-white"

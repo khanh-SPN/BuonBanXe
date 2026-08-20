@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from "react";
 import type { AppState } from "@/lib/types";
-import { formatIg, formatVnd, vndFromIg } from "@/lib/money";
 import type { Api, ApiResult } from "@/components/ui";
+import { WalletBar } from "@/components/WalletBar";
 import { Overview } from "@/components/tabs/Overview";
 import { VehiclesTab } from "@/components/tabs/VehiclesTab";
 import { IgTab } from "@/components/tabs/IgTab";
@@ -87,30 +87,12 @@ export function AppShell({ initialState }: { initialState: AppState }) {
             <span className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-[var(--ink)]">
               Buôn Bán Xe
             </span>
-            <span className="text-xs text-[var(--muted)]">rate {state.rate}</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2">
-              <p className="eyebrow">Ví IG</p>
-              <p className={`tnum text-xl font-semibold ${state.wallet.ig < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
-                {formatIg(state.wallet.ig)}
-              </p>
-              <p className="text-[10.5px] text-[var(--muted)]">
-                ≈ {formatVnd(vndFromIg(state.wallet.ig, state.rate))} tiền thật
-              </p>
-            </div>
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2">
-              <p className="eyebrow">Ví tiền thật</p>
-              <p className={`tnum text-xl font-semibold ${state.wallet.vnd < 0 ? "text-[var(--bad)]" : "text-[var(--ink)]"}`}>
-                {formatVnd(state.wallet.vnd)}
-              </p>
-              <p className="text-[10.5px] text-[var(--muted)]">từ mua / bán IG</p>
-            </div>
-            <button type="button" className="btn" onClick={() => refresh()} disabled={busy}>
+            <button type="button" className="btn btn-sm" onClick={() => refresh()} disabled={busy}>
               ↻ Làm mới
             </button>
           </div>
+
+          <WalletBar api={api} />
         </div>
 
         <nav className="mx-auto mt-3 flex max-w-[1500px] gap-1 overflow-x-auto">

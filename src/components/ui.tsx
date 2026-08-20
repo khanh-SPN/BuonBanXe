@@ -365,6 +365,38 @@ export function PasteZone({
   );
 }
 
+/**
+ * Ảnh có báo lỗi. Ảnh hỏng mà im lặng thì nhìn như "dán không lên", nên hiện
+ * hẳn chữ để biết là lỗi tải file chứ không phải mất ảnh.
+ */
+export function Thumb({
+  src,
+  alt,
+  onClick,
+  className,
+}: {
+  src: string;
+  alt: string;
+  onClick?: () => void;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 p-1 text-center text-[10px] text-[var(--bad)]">
+        <span>⚠ ảnh lỗi</span>
+        <span className="text-[9px] text-[var(--muted)]">không tải được file</span>
+      </span>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} onClick={onClick} className={className} onError={() => setFailed(true)} />
+  );
+}
+
 export function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();

@@ -381,7 +381,9 @@ export function deleteVehicle(id: number): ActionResult {
 }
 
 // ── Ảnh xe ────────────────────────────────────────────────────────────────────
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
+const IMAGE_DIR = path.join(process.cwd(), "data", "images");
+// Thư mục của bản đầu — giữ lại để ảnh cũ vẫn xoá được.
+const LEGACY_IMAGE_DIR = path.join(process.cwd(), "public", "uploads");
 
 export function attachImage(vehicleId: number, imgPath: string): VehicleImage | null {
   if (!getVehicle(vehicleId)) return null;
@@ -408,11 +410,14 @@ export function allVehicleImages(): VehicleImage[] {
 }
 
 function removeImageFile(imgPath: string) {
-  try {
-    const file = path.join(UPLOAD_DIR, path.basename(imgPath));
-    if (fs.existsSync(file)) fs.unlinkSync(file);
-  } catch {
-    // ảnh mất file thì thôi, không chặn thao tác
+  const name = path.basename(imgPath);
+  for (const dir of [IMAGE_DIR, LEGACY_IMAGE_DIR]) {
+    try {
+      const file = path.join(dir, name);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    } catch {
+      // ảnh mất file thì thôi, không chặn thao tác
+    }
   }
 }
 
