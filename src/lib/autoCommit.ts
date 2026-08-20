@@ -3,6 +3,8 @@
 // external scheduler, no spawned console window — so it's only ever active
 // when the web app itself is up, and stops the moment the server stops.
 import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { getDb } from "./db";
 
 const INTERVAL_MS = 10 * 60 * 1000;
@@ -46,6 +48,14 @@ async function tick() {
 
 export function startAutoCommit() {
   if (globalThis.__buonBanXeAutoCommitTimer) return;
+
+  // Bản chép cho người khác dùng không có .git — không có gì để backup, bỏ qua
+  // thay vì chạy git thất bại mỗi 10 phút.
+  if (!fs.existsSync(path.join(REPO_ROOT, ".git"))) {
+    console.log("[auto-backup] không thấy thư mục .git — bỏ qua backup, dữ liệu vẫn lưu ở data/");
+    return;
+  }
+
   console.log("[auto-backup] active — checking for changes and syncing to GitHub every 10 minutes while the app is running");
   const timer = setInterval(() => {
     tick().catch(() => {});
