@@ -132,7 +132,7 @@ export function SettingsTab({ api }: { api: Api }) {
           <p>
             Toàn bộ dữ liệu nằm ở <code className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[12px]">data/inventory.db</code>{" "}
             trên máy bạn, ảnh xe nằm ở{" "}
-            <code className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[12px]">public/uploads</code>.
+            <code className="rounded bg-[var(--chip)] px-1.5 py-0.5 text-[12px]">data/images</code>.
           </p>
           <p className="text-[var(--muted)]">
             App tự backup lên GitHub mỗi 10 phút khi đang chạy — bao gồm cả database và ảnh.
