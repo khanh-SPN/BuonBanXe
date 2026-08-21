@@ -1080,12 +1080,6 @@ body {
   );
 }
 
-@keyframes spot-spin {
-  to {
-    --spin: 360deg;
-  }
-}
-
 /* ── Quầng RGB bám theo con trỏ trên toàn trang ──────────────────────────── */
 .cursor-aura {
   position: fixed;
@@ -1172,10 +1166,12 @@ body {
 }
 
 /**
- * Viền cầu vồng CHẠY vòng quanh ô đang trỏ vào.
+ * Một ĐỐM SÁNG chạy vòng quanh mép ô đang trỏ vào, màu đổi liên tục.
  *
- * Cả viền hiện đủ (không che bằng vòng sáng quanh con trỏ nữa) rồi cho dải
- * conic quay — nên màu chạy vòng quanh mép chứ không đứng yên một màu.
+ * Cả vòng để trong suốt, chỉ chừa đúng một khoảng sáng có đầu trắng và đuôi mờ
+ * dần. Quay dải conic đó lên chính là cho cái đốm chạy vòng quanh viền. Không tô
+ * cầu vồng cả vòng nữa — tô hết thì mắt chỉ đọc ra "cái viền nhiều màu đứng yên"
+ * chứ không thấy có gì đang chạy.
  */
 .card::after,
 .wallet-card::after,
@@ -1190,11 +1186,22 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.6px;
+  padding: 2px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s ease;
-  background: var(--rgb-ring);
+  background: conic-gradient(
+    from var(--spin),
+    rgba(0, 217, 255, 0) 0deg,
+    rgba(0, 217, 255, 0.12) 18deg,
+    rgba(0, 217, 255, 0.5) 40deg,
+    rgba(180, 245, 255, 0.95) 54deg,
+    #ffffff 60deg,
+    rgba(180, 245, 255, 0.95) 66deg,
+    rgba(123, 91, 255, 0.55) 84deg,
+    rgba(123, 91, 255, 0) 116deg,
+    rgba(0, 217, 255, 0) 360deg
+  );
   -webkit-mask:
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
@@ -1215,15 +1222,33 @@ body {
 .chip-choice:hover::after,
 .pg-btn:hover:not(:disabled)::after {
   opacity: 1;
-  animation: spot-spin 2.6s linear infinite;
+  /* Vòng chạy 2,4s — màu đổi 5s. Hai chu kỳ lệch nhau nên không lặp lại y hệt. */
+  animation: beam-run 2.4s linear infinite, beam-hue 5s linear infinite;
 }
 
-/* Nút nhỏ thì viền mảnh hơn cho gọn */
+/* Đốm chạy hết một vòng viền. */
+@keyframes beam-run {
+  to {
+    --spin: 360deg;
+  }
+}
+
+/* Vừa chạy vừa đổi màu, kèm quầng nhoè cho cái đốm nổi hẳn lên. */
+@keyframes beam-hue {
+  from {
+    filter: drop-shadow(0 0 6px rgba(150, 230, 255, 0.8)) hue-rotate(0deg);
+  }
+  to {
+    filter: drop-shadow(0 0 6px rgba(150, 230, 255, 0.8)) hue-rotate(360deg);
+  }
+}
+
+/* Nút nhỏ thì vệt mảnh hơn cho gọn */
 .btn::after,
 .tab-btn::after,
 .chip-choice::after,
 .pg-btn::after {
-  padding: 1.1px;
+  padding: 1.6px;
 }
 
 /* ── Phân trang ──────────────────────────────────────────────────────────── */
@@ -1424,6 +1449,7 @@ body {
     display: none;
   }
 
+  /* Đốm đứng yên một chỗ nhìn như lỗi, nên đổi hẳn sang viền tĩnh. */
   .card:hover::before,
   .wallet-card:hover::before,
   .thumb:hover::before,
@@ -1438,6 +1464,19 @@ body {
   .chip-choice:hover::after,
   .pg-btn:hover:not(:disabled)::after {
     animation: none;
+  }
+
+  .card:hover::after,
+  .wallet-card:hover::after,
+  .thumb:hover::after,
+  .paste-zone:hover::after,
+  .modal:hover::after,
+  .btn:hover:not(:disabled)::after,
+  .tab-btn:hover::after,
+  .chip-choice:hover::after,
+  .pg-btn:hover:not(:disabled)::after {
+    background: var(--line-strong);
+    filter: none;
   }
 }
 
