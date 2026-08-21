@@ -36,6 +36,15 @@ const EMBERS = Array.from({ length: 16 }, (_, i) => ({
   color: i % 3 === 0 ? "#fbbf24" : i % 3 === 1 ? "#67e8f9" : "#38bdf8",
 }));
 
+/** Điểm sáng bạc bay lên — giá trị cố định. */
+const SPARKS = Array.from({ length: 12 }, (_, i) => ({
+  left: (i * 83 + 7) % 100,
+  size: 1.5 + ((i * 5) % 3),
+  delay: (i * 1.17) % 10,
+  duration: 9 + ((i * 11) % 6),
+  drift: ((i * 37) % 50) - 25,
+}));
+
 function FlameLogo() {
   return (
     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="brand-flame" aria-hidden>
@@ -65,6 +74,7 @@ function FlameLogo() {
 function Background() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+      <div className="bg-gif" />
       <div className="bg-grid absolute inset-0" />
       <div className="orb orb-cyan -top-28 left-[8%] h-80 w-[40rem]" />
       <div className="orb orb-gold -top-20 right-[4%] h-72 w-[30rem]" />
@@ -82,6 +92,20 @@ function Background() {
             animationDuration: `${e.duration}s`,
             animationDelay: `${e.delay}s`,
             ["--drift" as string]: `${e.drift}px`,
+          }}
+        />
+      ))}
+      {SPARKS.map((s, i) => (
+        <span
+          key={`spark-${i}`}
+          className="spark"
+          style={{
+            left: `${s.left}%`,
+            width: s.size,
+            height: s.size,
+            animationDuration: `${s.duration}s`,
+            animationDelay: `${s.delay}s`,
+            ["--drift" as string]: `${s.drift}px`,
           }}
         />
       ))}
@@ -153,7 +177,7 @@ export function AppShell({ initialState }: { initialState: AppState }) {
           <div className="flex items-center gap-3">
             <FlameLogo />
             <div className="flex flex-col">
-              <span className="brand-title text-2xl leading-tight tracking-tight">Buôn Bán Xe</span>
+              <span className="brand-title rgb-text text-2xl leading-tight tracking-tight">Buôn Bán Xe</span>
               <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
                 Kho xe · IG · Sổ quỹ
               </span>

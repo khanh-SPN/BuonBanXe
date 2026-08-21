@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ═════════════════════════════════════════════════════════════════════════
-   CHỦ ĐỀ: LỬA XANH · VÀNG · ĐEN
+   CHỦ ĐỀ: LỬA XANH · BẠC · VÀNG · ĐEN
    ═════════════════════════════════════════════════════════════════════════ */
 :root {
   --bg: #04060c;
@@ -18,6 +18,7 @@
   --accent-soft: rgba(34, 211, 238, 0.45);
   --accent-ink: #041318;
   --gold: #fbbf24;
+  --silver: #e2e8f0;
   --good: #34d399;
   --warn: #fbbf24;
   --bad: #fb7185;
@@ -132,7 +133,7 @@ body {
   right: 0;
   height: 2.5px;
   z-index: 90;
-  background: linear-gradient(90deg, transparent, var(--accent), var(--gold), transparent);
+  background: linear-gradient(90deg, transparent, var(--accent), var(--silver), var(--gold), transparent);
   background-size: 220% 100%;
   animation: busy-slide 1.1s linear infinite;
   box-shadow: 0 0 14px rgba(34, 211, 238, 0.6);
@@ -168,7 +169,7 @@ body {
 
 .brand-title {
   font-family: var(--font-display), system-ui, sans-serif;
-  background: linear-gradient(92deg, #a5f3fc 0%, #22d3ee 38%, #fbbf24 100%);
+  background: linear-gradient(92deg, #a5f3fc 0%, #22d3ee 38%, #e2e8f0 68%, #fbbf24 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -793,7 +794,7 @@ body {
   height: 2.5px;
   width: 100%;
   transform-origin: left;
-  background: linear-gradient(90deg, var(--accent), var(--gold));
+  background: linear-gradient(90deg, var(--accent), var(--silver), var(--gold));
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.7);
   animation: toast-bar 4.2s linear forwards;
 }
@@ -933,7 +934,8 @@ body {
   pointer-events: none;
 }
 
-@keyframes gif# 0%,
+@keyframes gif-breathe {
+  0%,
   100% {
     opacity: 0.14;
   }
@@ -942,9 +944,112 @@ body {
   }
 }
 
-/* ── Viền RGB chạy màu liên tục姉、逐章”的 "eska
-  .01du:
+/* ── Viền RGB chạy màu liên tục ──────────────────────────────────────────── */
+.rgb-border {
+  position: relative;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--panel-2), var(--panel-2)) padding-box,
+    linear-gradient(120deg, #22d3ee, #e2e8f0, #fbbf24, #22d3ee) border-box;
+  background-size: 100% 100%, 300% 300%;
+  animation: rgb-slide 6s linear infinite;
+}
 
-- list 1 4ddasasembly1] = this.ANEXAB, error
--- > no. 0.0.1 -/ comments  C 语言:? + +too-costic4. ical for the winternoon”</suppora, theshldor 2
-結合、dmit@verb| (edg#姮尔, CSS# 3.0.0. 3.0.+++++++ REPL
+@keyframes rgb-slide {
+  0% {
+    background-position: 0 0, 0% 50%;
+  }
+  100% {
+    background-position: 0 0, 300% 50%;
+  }
+}
+
+/* ── Chữ RGB chạy màu ────────────────────────────────────────────────────── */
+.rgb-text {
+  background: linear-gradient(90deg, #22d3ee, #e2e8f0, #fbbf24, #22d3ee);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rgb-text-slide 5s linear infinite;
+}
+
+@keyframes rgb-text-slide {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 300% 50%;
+  }
+}
+
+/* ── Glow RGB chạy màu ───────────────────────────────────────────────────── */
+.rgb-glow {
+  animation: rgb-glow-pulse 3.2s ease-in-out infinite;
+}
+
+@keyframes rgb-glow-pulse {
+  0%,
+  100% {
+    text-shadow: 0 0 18px rgba(34, 211, 238, 0.55);
+  }
+  33% {
+    text-shadow: 0 0 18px rgba(226, 232, 255, 0.5);
+  }
+  66% {
+    text-shadow: 0 0 18px rgba(251, 191, 36, 0.5);
+  }
+}
+
+/* ── Shimmer quét ngang ───────────────────────────────────────────────────── */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.5) 50%, transparent 70%);
+  transform: translateX(-150%);
+  animation: shimmer-sweep 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-150%);
+  }
+  55%,
+  100% {
+    transform: translateX(150%);
+  }
+}
+
+/* ── Điểm sáng bạc bay lên ──────────────────────────────────────────────── */
+.spark {
+  position: absolute;
+  border-radius: 999px;
+  background: #e2e8f0;
+  box-shadow: 0 0 8px #e2e8f0, 0 0 16px rgba(34, 211, 238, 0.6);
+  opacity: 0;
+  animation: spark-rise linear infinite;
+}
+
+@keyframes spark-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate3d(var(--drift, 20px), -110vh, 0) scale(0.2);
+    opacity: 0;
+  }
+}
