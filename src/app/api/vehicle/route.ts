@@ -66,10 +66,15 @@ export async function POST(req: Request) {
     case "sell": {
       if (!vehicleId) return NextResponse.json(bad("Chưa chọn xe."));
       const price = amount(body.price);
-      if (price == null) return NextResponse.json(bad(`Giá bán không đọc được: "${body.price}"`));
+      if (price == null) return NextResponse.json(bad(`Giá treo không đọc được: "${body.price}"`));
+      // Bỏ trống trả trước là hợp lệ — chỉ báo lỗi khi gõ vào mà đọc không ra.
+      const blankUpfront = body.upfront === undefined || body.upfront === null || body.upfront === "";
+      const upfront = blankUpfront ? 0 : amount(body.upfront);
+      if (upfront == null) return NextResponse.json(bad(`Tiền trả trước không đọc được: "${body.upfront}"`));
       result = sellVehicle({
         id: vehicleId,
         price,
+        upfront,
         customerName: text(body.customerName),
         note: text(body.note),
         at,

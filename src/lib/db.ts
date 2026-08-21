@@ -37,6 +37,7 @@ function ensureSchema(db: DatabaseSync) {
       expected_price INTEGER NOT NULL,
       agreed_price INTEGER,
       actual_price INTEGER,
+      upfront_price INTEGER,
       status TEXT NOT NULL DEFAULT 'Còn hàng',
       customer_name TEXT,
       note TEXT,
@@ -123,6 +124,10 @@ function ensureSchema(db: DatabaseSync) {
   }
   if (!columnExists(db, "vehicles", "customer_name")) {
     db.exec(`ALTER TABLE vehicles ADD COLUMN customer_name TEXT`);
+  }
+  // Phần khách trả trước ngoài chợ — không chịu thuế. actual_price vẫn là tổng thu.
+  if (!columnExists(db, "vehicles", "upfront_price")) {
+    db.exec(`ALTER TABLE vehicles ADD COLUMN upfront_price INTEGER`);
   }
 }
 

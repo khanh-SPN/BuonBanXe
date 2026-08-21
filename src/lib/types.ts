@@ -8,7 +8,10 @@ export interface Vehicle {
   purchase_price: number;
   expected_price: number;
   agreed_price: number | null;
+  /** Tổng thu khi bán = trả trước + giá treo. */
   actual_price: number | null;
+  /** Phần khách trả trước ngoài chợ — không chịu thuế. */
+  upfront_price: number | null;
   status: VehicleStatus;
   customer_name: string | null;
   note: string | null;

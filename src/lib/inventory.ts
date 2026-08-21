@@ -6,6 +6,7 @@ import {
   expectedSellPrice,
   formatIg,
   saleTax,
+  saleTotal,
 } from "./money";
 import { getDb } from "./db";
 import type { PeriodStat, Vehicle, VehicleImage } from "./types";
@@ -209,9 +210,15 @@ export function cancelDeposit(opts: {
 }
 
 // ── Bán xe ────────────────────────────────────────────────────────────────────
+/**
+ * `price` là **giá treo** trên chợ — phần duy nhất chịu thuế {@link TAX_LABEL}.
+ * `upfront` là tiền khách trả trước ngoài chợ, không mất thuế. Không nhập
+ * `upfront` thì y như cũ: treo bao nhiêu là bán bấy nhiêu.
+ */
 export function sellVehicle(opts: {
   id: number;
   price: number;
+  upfront?: number | null;
   customerName?: string | null;
   note?: string | null;
   at?: string;
@@ -219,7 +226,9 @@ export function sellVehicle(opts: {
   const vehicle = getVehicle(opts.id);
   if (!vehicle) return { ok: false, message: `Không tìm thấy xe #${opts.id}.` };
   if (vehicle.status === "Đã bán hết") return { ok: false, message: `Xe ${vehicle.name} đã bán rồi.` };
-  if (!opts.price || opts.price <= 0) return { ok: false, message: "Giá bán phải lớn hơn 0." };
+  if (!opts.price || opts.price <= 0) return { ok: false, message: "Giá treo phải lớn hơn 0." };
+  if (opts.upfront != null && opts.upfront < 0)
+    return { ok: false, message: "Tiền trả trước không được âm." };
 
   const ts = nowIso();
   const at = opts.at ?? ts;
@@ -232,22 +241,25 @@ export function sellVehicle(opts: {
     };
   }
 
-  const price = Math.round(opts.price);
-  const tax = saleTax(price);
-  const profit = actualProfit(vehicle.purchase_price, price);
+  const listed = Math.round(opts.price);
+  const upfront = Math.round(opts.upfront ?? 0);
+  const total = saleTotal(listed, upfront);
+  const tax = saleTax(listed);
+  const profit = actualProfit(vehicle.purchase_price, listed, upfront);
   const depositTaken = vehicle.deposit_amount ?? 0;
-  const collectNow = price - depositTaken;
+  const collectNow = total - depositTaken;
   const note = [vehicle.note, opts.note?.trim()].filter(Boolean).join(" ; ");
   const customer = opts.customerName?.trim() || vehicle.customer_name;
 
   getDb()
     .prepare(
       `UPDATE vehicles
-       SET status = 'Đã bán hết', actual_price = ?, agreed_price = COALESCE(agreed_price, ?),
+       SET status = 'Đã bán hết', actual_price = ?, upfront_price = ?,
+           agreed_price = COALESCE(agreed_price, ?),
            profit = ?, sold_at = ?, customer_name = ?, note = ?, updated_at = ?
        WHERE id = ?`,
     )
-    .run(price, price, profit, at, customer || null, note || null, ts, opts.id);
+    .run(total, upfront || null, total, profit, at, customer || null, note || null, ts, opts.id);
 
   addLedger({
     kind: "car_sell",
@@ -261,17 +273,18 @@ export function sellVehicle(opts: {
   addLedger({
     kind: "car_tax",
     category: "Xe",
-    label: `Thuế bán ${TAX_LABEL} — ${vehicle.name}`,
+    label: `Thuế bán ${TAX_LABEL} trên giá treo ${formatIg(listed)} — ${vehicle.name}`,
     igDelta: -tax,
     refType: "vehicle_sale",
     refId: opts.id,
     at,
   });
 
+  const split = upfront > 0 ? ` (trả trước ${formatIg(upfront)} + treo ${formatIg(listed)})` : "";
   return {
     ok: true,
     vehicleId: opts.id,
-    message: `Đã bán ${vehicle.name} giá ${formatIg(price)} — thuế ${formatIg(tax)}, lãi thực ${formatIg(profit)}`,
+    message: `Đã bán ${vehicle.name} thu ${formatIg(total)}${split} — thuế ${formatIg(tax)}, lãi thực ${formatIg(profit)}`,
   };
 }
 
@@ -289,7 +302,7 @@ export function unsellVehicle(id: number): ActionResult {
   getDb()
     .prepare(
       `UPDATE vehicles
-       SET status = ?, actual_price = NULL, profit = NULL, sold_at = NULL,
+       SET status = ?, actual_price = NULL, upfront_price = NULL, profit = NULL, sold_at = NULL,
            agreed_price = ?, customer_name = ?, updated_at = ?
        WHERE id = ?`,
     )

@@ -291,12 +291,15 @@ export function Modal({
   onClose,
   children,
   footer,
+  wide,
 }: {
   title: string;
   icon?: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** Cho bảng nhiều cột thở — rộng gấp rưỡi modal thường. */
+  wide?: boolean;
 }) {
   useScrollLock();
   useHotkeys((e) => {
@@ -306,7 +309,7 @@ export function Modal({
   return (
     <Portal>
       <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="modal">
+        <div className={`modal ${wide ? "modal-wide" : ""}`}>
           <div className="card-head">
             <h3>
               {icon && <span className="mr-1.5">{icon}</span>}

@@ -107,12 +107,20 @@ export function expectedSellPrice(purchasePrice: number): number {
   return Math.round(purchasePrice * EXPECTED_MARKUP);
 }
 
-/** Tiền thuế phải nộp khi bán. */
-export function saleTax(sellPrice: number): number {
-  return Math.round(sellPrice * TAX_RATE);
+/**
+ * Thuế bán chỉ đánh vào phần **giá treo** trên chợ. Tiền khách trả trước ngoài
+ * chợ không đi qua chợ nên không mất thuế.
+ */
+export function saleTax(listedPrice: number): number {
+  return Math.round(listedPrice * TAX_RATE);
 }
 
-/** Lãi thực = giá bán thực tế − thuế − giá nhập. */
-export function actualProfit(purchasePrice: number, sellPrice: number): number {
-  return Math.round(sellPrice * (1 - TAX_RATE) - purchasePrice);
+/** Tổng thu của một lần bán = trả trước + giá treo. */
+export function saleTotal(listedPrice: number, upfront = 0): number {
+  return Math.round(upfront) + Math.round(listedPrice);
+}
+
+/** Lãi thực = trả trước + giá treo − thuế (chỉ trên giá treo) − giá nhập. */
+export function actualProfit(purchasePrice: number, listedPrice: number, upfront = 0): number {
+  return saleTotal(listedPrice, upfront) - saleTax(listedPrice) - Math.round(purchasePrice);
 }

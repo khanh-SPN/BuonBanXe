@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import type { Vehicle } from "@/lib/types";
-import { EXPECTED_MARKUP, TAX_LABEL, formatIg, parseMoney, saleTax } from "@/lib/money";
+import {
+  EXPECTED_MARKUP,
+  TAX_LABEL,
+  actualProfit,
+  formatIg,
+  parseMoney,
+  saleTax,
+  saleTotal,
+} from "@/lib/money";
 import { formatDateTime } from "@/lib/datetime";
 import { HOURS_48_MS, countdownText, msUntilSellable } from "@/lib/sellable";
 import {
@@ -316,6 +324,16 @@ function VehicleCard({
               <>
                 <span className="text-[var(--muted)]">Giá bán</span>
                 <span className="text-right"><Ig v={v.actual_price} /></span>
+                {!guest && v.upfront_price != null && v.upfront_price > 0 && (
+                  <>
+                    <span className="text-[var(--muted)]">↳ trả trước</span>
+                    <span className="text-right text-[11.5px]"><Ig v={v.upfront_price} tone="warn" /></span>
+                    <span className="text-[var(--muted)]">↳ treo chợ</span>
+                    <span className="text-right text-[11.5px]">
+                      <Ig v={(v.actual_price ?? 0) - v.upfront_price} />
+                    </span>
+                  </>
+                )}
                 {!guest && (
                   <>
                     <span className="text-[var(--muted)]">Lãi thực</span>
@@ -540,6 +558,7 @@ function DepositModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; o
 
 // ── Bán xe ────────────────────────────────────────────────────────────────────
 function SellModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; onClose: () => void }) {
+  const [upfront, setUpfront] = useState("");
   const [price, setPrice] = useState(vehicle.agreed_price ? String(vehicle.agreed_price) : "");
   const [customer, setCustomer] = useState(vehicle.customer_name ?? "");
   const [note, setNote] = useState("");
@@ -547,10 +566,14 @@ function SellModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; onCl
   const [date, setDate] = useState(todayDate());
   const [time, setTime] = useState(nowTime());
 
-  const p = parseMoney(price) ?? 0;
-  const tax = p > 0 ? saleTax(p) : 0;
-  const profit = p > 0 ? p - tax - vehicle.purchase_price : 0;
+  const listed = parseMoney(price) ?? 0;
+  const up = upfront.trim() ? parseMoney(upfront) ?? 0 : 0;
+  const total = listed > 0 ? saleTotal(listed, up) : 0;
+  const tax = listed > 0 ? saleTax(listed) : 0;
+  const profit = listed > 0 ? actualProfit(vehicle.purchase_price, listed, up) : 0;
   const deposit = vehicle.deposit_amount ?? 0;
+  // Nếu treo hết lên chợ thì thuế sẽ là bấy nhiêu — chênh lệch là tiền né được.
+  const taxSaved = saleTax(total) - tax;
   const timer = sellableIn(vehicle.imported_at);
 
   async function submit() {
@@ -558,6 +581,7 @@ function SellModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; onCl
       action: "sell",
       id: vehicle.id,
       price,
+      upfront: upfront.trim() || undefined,
       customerName: customer || undefined,
       note: note || undefined,
       at: useTime ? buildAt(date, time) : undefined,
@@ -572,7 +596,7 @@ function SellModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; onCl
       onClose={onClose}
       footer={
         <>
-          <button type="button" className="btn btn-primary flex-1" onClick={submit} disabled={p <= 0 || api.busy}>
+          <button type="button" className="btn btn-primary flex-1" onClick={submit} disabled={listed <= 0 || api.busy}>
             Xác nhận bán
           </button>
           <button type="button" className="btn" onClick={onClose}>
@@ -586,28 +610,55 @@ function SellModal({ api, vehicle, onClose }: { api: Api; vehicle: Vehicle; onCl
           Xe chưa đủ 48 giờ ({timer.text}). Muốn bán sớm thì tick “thời gian thủ công” và chọn mốc sau {formatDateTime(new Date(new Date(vehicle.imported_at).getTime() + HOURS_48_MS).toISOString())}.
         </p>
       )}
-      <MoneyInput label="Giá bán thực tế" value={price} onChange={setPrice} required autoFocus />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MoneyInput
+          label="Trả trước (không mất thuế)"
+          value={upfront}
+          onChange={setUpfront}
+          hint="Khách đưa tay ngoài chợ. Không có thì bỏ trống."
+        />
+        <MoneyInput
+          label={`Giá treo (chịu thuế ${TAX_LABEL})`}
+          value={price}
+          onChange={setPrice}
+          required
+          autoFocus
+        />
+      </div>
       <Field label="Tên khách mua">
         <input className="input" value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="để trống nếu giữ khách đã cọc" />
       </Field>
-      {p > 0 && (
-        <div className="grid grid-cols-2 gap-2 rounded-xl border border-[var(--line)] bg-[var(--chip)] p-3 text-[12px] sm:grid-cols-4">
-          <div>
-            <p className="text-[var(--muted)]">Thuế {TAX_LABEL}</p>
-            <p className="tnum text-[var(--bad)]">{formatIg(tax)}</p>
+      {listed > 0 && (
+        <div className="grid gap-2">
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-[var(--line)] bg-[var(--chip)] p-3 text-[12px] sm:grid-cols-4">
+            <div>
+              <p className="text-[var(--muted)]">Tổng thu</p>
+              <p className="tnum text-[var(--ink)]">{formatIg(total)}</p>
+            </div>
+            <div>
+              <p className="text-[var(--muted)]">Thuế {TAX_LABEL}</p>
+              <p className="tnum text-[var(--bad)]">{formatIg(tax)}</p>
+            </div>
+            <div>
+              <p className="text-[var(--muted)]">Lãi thực</p>
+              <p className={`tnum ${profit >= 0 ? "text-[var(--good)]" : "text-[var(--bad)]"}`}>{formatIg(profit)}</p>
+            </div>
+            <div>
+              <p className="text-[var(--muted)]">Ví cộng thêm</p>
+              <p className="tnum text-[var(--good)]">{formatIg(total - deposit - tax)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[var(--muted)]">Lãi thực</p>
-            <p className={`tnum ${profit >= 0 ? "text-[var(--good)]" : "text-[var(--bad)]"}`}>{formatIg(profit)}</p>
-          </div>
-          <div>
-            <p className="text-[var(--muted)]">Đã cọc</p>
-            <p className="tnum text-[var(--warn)]">{deposit ? formatIg(deposit) : "—"}</p>
-          </div>
-          <div>
-            <p className="text-[var(--muted)]">Ví cộng thêm</p>
-            <p className="tnum text-[var(--good)]">{formatIg(p - deposit - tax)}</p>
-          </div>
+          <p className="text-[11.5px] text-[var(--muted)]">
+            {up > 0 ? (
+              <>
+                Trả trước {formatIg(up)} + treo {formatIg(listed)} · thuế chỉ tính trên giá treo →{" "}
+                <span className="text-[var(--good)]">đỡ được {formatIg(taxSaved)}</span> so với treo cả {formatIg(total)}.
+              </>
+            ) : (
+              <>Treo cả {formatIg(listed)} lên chợ nên chịu thuế {TAX_LABEL} trên toàn bộ.</>
+            )}
+            {deposit > 0 && <> · đã nhận cọc trước {formatIg(deposit)}.</>}
+          </p>
         </div>
       )}
       <Field label="Ghi chú">
