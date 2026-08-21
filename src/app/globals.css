@@ -915,3 +915,36 @@ body {
 .glow-bad {
   text-shadow: 0 0 18px rgba(251, 113, 133, 0.45);
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   HIỆU ỨNG ĐIỆN ẢNH · RGB CHẠY MÀU · GIF NỀN
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Lớp nền GIF lửa ─────────────────────────────────────────────────────── */
+.bg-gif {
+  position: fixed;
+  inset: 0;
+  background-image: url("/bg-fire.gif");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.16;
+  mix-blend-mode: screen;
+  animation: gif-breathe 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes gif# 0%,
+  100% {
+    opacity: 0.14;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* ── Viền RGB chạy màu liên tục姉、逐章”的 "eska
+  .01du:
+
+- list 1 4ddasasembly1] = this.ANEXAB, error
+-- > no. 0.0.1 -/ comments  C 语言:? + +too-costic4. ical for the winternoon”</suppora, theshldor 2
+結合、dmit@verb| (edg#姮尔, CSS# 3.0.0. 3.0.+++++++ REPL
