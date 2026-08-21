@@ -1139,7 +1139,11 @@ body {
   position: relative;
 }
 
-/* Quầng sáng bên trong (chỉ cho mảng lớn) */
+/**
+ * Đèn rọi bám con trỏ — cố ý để trắng xanh, KHÔNG cầu vồng. Một mảng cầu vồng
+ * bị che thành vòng tròn nhỏ thì mắt chỉ thấy đúng một màu, nhìn như đứng màu.
+ * Cầu vồng để dành hết cho cái viền chạy vòng bên dưới.
+ */
 .card::before,
 .wallet-card::before,
 .thumb::before,
@@ -1151,11 +1155,12 @@ body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
-  background:
-    radial-gradient(220px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.09), transparent 62%),
-    var(--rgb-ring);
-  -webkit-mask: radial-gradient(230px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 70%);
-  mask: radial-gradient(230px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 70%);
+  background: radial-gradient(
+    240px circle at var(--mx) var(--my),
+    rgba(200, 245, 255, 0.15),
+    rgba(120, 200, 255, 0.05) 42%,
+    transparent 70%
+  );
   mix-blend-mode: screen;
 }
 
@@ -1163,11 +1168,15 @@ body {
 .wallet-card:hover::before,
 .thumb:hover::before,
 .paste-zone:hover::before {
-  opacity: 0.5;
-  animation: spot-spin 6s linear infinite;
+  opacity: 1;
 }
 
-/* Viền cầu vồng sáng đúng chỗ con trỏ đang đứng */
+/**
+ * Viền cầu vồng CHẠY vòng quanh ô đang trỏ vào.
+ *
+ * Cả viền hiện đủ (không che bằng vòng sáng quanh con trỏ nữa) rồi cho dải
+ * conic quay — nên màu chạy vòng quanh mép chứ không đứng yên một màu.
+ */
 .card::after,
 .wallet-card::after,
 .thumb::after,
@@ -1181,16 +1190,16 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.4px;
+  padding: 1.6px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
   background: var(--rgb-ring);
   -webkit-mask:
-    radial-gradient(210px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 74%),
+    linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   mask:
-    radial-gradient(210px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 74%),
+    linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   -webkit-mask-composite: source-out;
   mask-composite: subtract;
@@ -1206,7 +1215,7 @@ body {
 .chip-choice:hover::after,
 .pg-btn:hover:not(:disabled)::after {
   opacity: 1;
-  animation: spot-spin 5s linear infinite;
+  animation: spot-spin 2.6s linear infinite;
 }
 
 /* Nút nhỏ thì viền mảnh hơn cho gọn */
@@ -1442,8 +1451,40 @@ body {
   cursor: pointer;
 }
 
-.row-click:hover {
-  background: rgba(34, 211, 238, 0.07);
+/**
+ * Dòng bảng không ôm được viền bo góc (border-collapse), nên thay vì viền thì
+ * cho một vạch cầu vồng chạy dọc chân dòng đang trỏ vào.
+ */
+.data-table tbody tr:hover {
+  background-color: rgba(34, 211, 238, 0.055);
+  background-image: linear-gradient(
+    90deg,
+    #ff2d95,
+    #ff8a00,
+    #ffe600,
+    #24ff8f,
+    #00d9ff,
+    #7b5bff,
+    #ff2d95
+  );
+  background-size: 300% 2px;
+  background-repeat: no-repeat;
+  background-position: 0% 100%;
+  animation: rgb-line-run 2.6s linear infinite;
+}
+
+@keyframes rgb-line-run {
+  to {
+    background-position: 100% 100%;
+  }
+}
+
+/* Đặt ngay sau luật trên để chắc chắn thắng thứ tự xếp chồng. */
+@media (prefers-reduced-motion: reduce) {
+  .data-table tbody tr:hover {
+    animation: none;
+    background-image: none;
+  }
 }
 
 .row-click:focus-visible {
