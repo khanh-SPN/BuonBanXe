@@ -53,7 +53,7 @@ function RateBox({ api }: { api: Api }) {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-3 py-1.5">
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-2)]/80 px-3 py-1.5 shadow-[0_0_18px_rgba(34,211,238,0.06)] transition focus-within:border-[var(--line-strong)] focus-within:shadow-[0_0_22px_rgba(34,211,238,0.16)]">
       <span className="eyebrow">Rate</span>
       <input
         className="input tnum w-[76px] px-2 py-1 text-center text-[13px]"
@@ -121,7 +121,7 @@ function WalletBox({
   }
 
   return (
-    <div className="min-w-[190px] rounded-xl border border-[var(--line)] bg-[var(--panel-2)] px-4 py-2">
+    <div className={`wallet-card min-w-[190px] px-4 py-2 ${field === "walletVnd" ? "wallet-vnd" : ""}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="eyebrow">{label}</p>
         {!editing && (
@@ -169,7 +169,13 @@ function WalletBox({
         </div>
       ) : (
         <>
-          <button type="button" className={`tnum block text-left text-xl font-semibold ${cls}`} onClick={open}>
+          <button
+            type="button"
+            className={`tnum block text-left text-xl font-semibold ${cls} ${
+              tone === "good" ? "glow-good" : tone === "bad" ? "glow-bad" : "glow-cyan"
+            }`}
+            onClick={open}
+          >
             {format(value)}
           </button>
           <p className="text-[10.5px] text-[var(--muted)]">{sub}</p>

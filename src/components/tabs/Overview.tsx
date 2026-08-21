@@ -30,7 +30,7 @@ export function Overview({
       <div className="grid gap-3 md:grid-cols-2">
         <div className="card card-pad">
           <p className="eyebrow">Ví IG đang có</p>
-          <p className={`tnum mt-1 text-3xl font-semibold ${w.ig < 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
+          <p className={`tnum mt-1 text-3xl font-semibold ${w.ig < 0 ? "text-[var(--bad)] glow-bad" : "text-[var(--good)] glow-good"}`}>
             {formatIg(w.ig)}
           </p>
           <p className="mt-1 text-[12px] text-[var(--muted)]">
@@ -45,7 +45,7 @@ export function Overview({
 
         <div className="card card-pad">
           <p className="eyebrow">Ví tiền thật</p>
-          <p className={`tnum mt-1 text-3xl font-semibold ${w.vnd < 0 ? "text-[var(--bad)]" : "text-[var(--ink)]"}`}>
+          <p className={`tnum mt-1 text-3xl font-semibold ${w.vnd < 0 ? "text-[var(--bad)] glow-bad" : "text-[var(--ink)] glow-cyan"}`}>
             {formatVnd(w.vnd)}
           </p>
           <p className="mt-1 text-[12px] text-[var(--muted)]">tiền ATM bỏ ra mua IG / thu về khi bán IG</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { AppState } from "@/lib/types";
 import type { Api, ApiResult } from "@/components/ui";
 import { WalletBar } from "@/components/WalletBar";
@@ -24,11 +24,77 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+type ToastItem = { id: number; message: string; ok: boolean };
+
+/** Tia than bay lên — giá trị cố định để không lệch khi render server/client. */
+const EMBERS = Array.from({ length: 16 }, (_, i) => ({
+  left: (i * 61 + 13) % 100,
+  size: 2 + ((i * 7) % 4),
+  delay: (i * 0.93) % 9,
+  duration: 8 + ((i * 13) % 7),
+  drift: ((i * 29) % 60) - 30,
+  color: i % 3 === 0 ? "#fbbf24" : i % 3 === 1 ? "#67e8f9" : "#38bdf8",
+}));
+
+function FlameLogo() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="brand-flame" aria-hidden>
+      <defs>
+        <linearGradient id="flameGrad" x1="4" y1="20" x2="20" y2="4" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#22d3ee" />
+          <stop offset="55%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#fbbf24" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+        stroke="url(#flameGrad)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 21c-1.7 0-3-1.3-3-3 0-1.5 1-2.5 1.9-3.5.5-.6.9-1.2 1.1-2 .9 1.3 3 3 3 5.5 0 1.7-1.3 3-3 3z"
+        fill="url(#flameGrad)"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+function Background() {
+  return (
+    <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+      <div className="bg-grid absolute inset-0" />
+      <div className="orb orb-cyan -top-28 left-[8%] h-80 w-[40rem]" />
+      <div className="orb orb-gold -top-20 right-[4%] h-72 w-[30rem]" />
+      <div className="orb orb-blue bottom-[-8rem] left-1/2 h-96 w-[52rem] -translate-x-1/2" />
+      {EMBERS.map((e, i) => (
+        <span
+          key={i}
+          className="ember"
+          style={{
+            left: `${e.left}%`,
+            width: e.size,
+            height: e.size,
+            background: e.color,
+            boxShadow: `0 0 ${e.size * 3}px ${e.color}`,
+            animationDuration: `${e.duration}s`,
+            animationDelay: `${e.delay}s`,
+            ["--drift" as string]: `${e.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function AppShell({ initialState }: { initialState: AppState }) {
   const [state, setState] = useState<AppState>(initialState);
   const [tab, setTab] = useState<TabKey>("overview");
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<{ message: string; ok: boolean } | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastId = useRef(0);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/state");
@@ -45,8 +111,11 @@ export function AppShell({ initialState }: { initialState: AppState }) {
   );
 
   const notify = useCallback((message: string, ok = true) => {
-    setToast({ message, ok });
-    window.setTimeout(() => setToast(null), 4200);
+    const id = ++toastId.current;
+    setToasts((t) => [...t.slice(-3), { id, message, ok }]);
+    window.setTimeout(() => {
+      setToasts((t) => t.filter((x) => x.id !== id));
+    }, 4200);
   }, []);
 
   const send = useCallback(
@@ -76,18 +145,20 @@ export function AppShell({ initialState }: { initialState: AppState }) {
 
   return (
     <div className="relative flex min-h-dvh flex-col">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 left-1/2 h-72 w-[42rem] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(196,112,45,0.22),transparent_68%)] blur-2xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(56,120,110,0.14),transparent_70%)] blur-2xl" />
-      </div>
+      <Background />
+      {busy && <div className="busy-bar" />}
 
-      <header className="relative z-10 border-b border-[var(--line)] px-4 py-3 sm:px-6">
+      <header className="app-header relative z-10 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
-          <div className="flex items-baseline gap-3">
-            <span className="font-[family-name:var(--font-display)] text-2xl tracking-tight text-[var(--ink)]">
-              Buôn Bán Xe
-            </span>
-            <button type="button" className="btn btn-sm" onClick={() => refresh()} disabled={busy}>
+          <div className="flex items-center gap-3">
+            <FlameLogo />
+            <div className="flex flex-col">
+              <span className="brand-title text-2xl leading-tight tracking-tight">Buôn Bán Xe</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Kho xe · IG · Sổ quỹ
+              </span>
+            </div>
+            <button type="button" className="btn btn-sm ml-2" onClick={() => refresh()} disabled={busy}>
               ↻ Làm mới
             </button>
           </div>
@@ -95,7 +166,7 @@ export function AppShell({ initialState }: { initialState: AppState }) {
           <WalletBar api={api} />
         </div>
 
-        <nav className="mx-auto mt-3 flex max-w-[1500px] gap-1 overflow-x-auto">
+        <nav className="mx-auto mt-3 flex max-w-[1500px] gap-1 overflow-x-auto pb-0.5">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -111,16 +182,26 @@ export function AppShell({ initialState }: { initialState: AppState }) {
       </header>
 
       <main className="relative z-10 mx-auto w-full max-w-[1500px] flex-1 p-3 sm:p-5">
-        {tab === "overview" && <Overview api={api} onJump={openTab} />}
-        {tab === "vehicles" && <VehiclesTab api={api} />}
-        {tab === "ig" && <IgTab api={api} />}
-        {tab === "cash" && <CashTab api={api} />}
-        {tab === "debts" && <DebtsTab api={api} />}
-        {tab === "report" && <ReportTab api={api} />}
-        {tab === "settings" && <SettingsTab api={api} />}
+        <div key={tab} className="animate-fade-up">
+          {tab === "overview" && <Overview api={api} onJump={openTab} />}
+          {tab === "vehicles" && <VehiclesTab api={api} />}
+          {tab === "ig" && <IgTab api={api} />}
+          {tab === "cash" && <CashTab api={api} />}
+          {tab === "debts" && <DebtsTab api={api} />}
+          {tab === "report" && <ReportTab api={api} />}
+          {tab === "settings" && <SettingsTab api={api} />}
+        </div>
       </main>
 
-      {toast && <div className={`toast ${toast.ok ? "ok" : "err"}`}>{toast.message}</div>}
+      <div className="toast-stack">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.ok ? "ok" : "err"}`} role="status">
+            <span className={`toast-icon ${t.ok ? "ok" : "err"}`}>{t.ok ? "✓" : "✕"}</span>
+            <span className="toast-msg">{t.message}</span>
+            <span className="toast-bar" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

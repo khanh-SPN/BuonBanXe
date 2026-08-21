@@ -63,9 +63,9 @@ export function Metric({
   tone?: "good" | "bad" | "warn";
 }) {
   const cls =
-    tone === "good" ? "text-[var(--good)]" :
-    tone === "bad" ? "text-[var(--bad)]" :
-    tone === "warn" ? "text-[var(--warn)]" :
+    tone === "good" ? "text-[var(--good)] glow-good" :
+    tone === "bad" ? "text-[var(--bad)] glow-bad" :
+    tone === "warn" ? "text-[var(--warn)] glow-gold" :
     "text-[var(--ink)]";
   return (
     <div className="card card-pad">
@@ -257,8 +257,13 @@ export function Modal({
             {icon && <span className="mr-1.5">{icon}</span>}
             {title}
           </h3>
-          <button type="button" className="btn btn-sm" onClick={onClose}>
-            Đóng
+          <button
+            type="button"
+            className="btn btn-sm !px-2.5"
+            onClick={onClose}
+            aria-label="Đóng"
+          >
+            ✕
           </button>
         </div>
         <div className="grid gap-3.5 p-4">{children}</div>

@@ -17,6 +17,9 @@ const display = Sora({
 export const metadata: Metadata = {
   title: "Buôn Bán Xe",
   description: "Quản lý kho xe, ví IG, mua bán IG, chi tiêu và nợ",
+  other: {
+    "theme-color": "#04060c",
+  },
 };
 
 export default function RootLayout({
@@ -26,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className={`${body.variable} ${display.variable} h-full`}>
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased [color-scheme:dark]">{children}</body>
     </html>
   );
 }
