@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState } from "@/lib/types";
 import type { Api, ApiResult } from "@/components/ui";
 import { WalletBar } from "@/components/WalletBar";
@@ -113,6 +113,67 @@ function Background() {
   );
 }
 
+/** Những thứ sẽ sáng RGB lên đúng chỗ con trỏ đang đứng. */
+const GLOW_SELECTOR = ".card, .wallet-card, .thumb, .paste-zone, .modal, .btn, .tab-btn, .chip-choice, .pg-btn";
+
+/**
+ * Quầng RGB bám theo chuột + toạ độ chuột cho từng phần tử đang trỏ.
+ *
+ * Một listener duy nhất cho cả trang. Quầng chạy đuổi theo con trỏ bằng rAF và
+ * tự dừng vòng lặp khi đã bắt kịp, nên lúc để yên chuột là không tốn gì.
+ */
+function CursorGlow() {
+  const auraRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const aura = auraRef.current;
+    let raf = 0;
+    let tx = window.innerWidth / 2;
+    let ty = window.innerHeight / 2;
+    let x = tx;
+    let y = ty;
+
+    const tick = () => {
+      x += (tx - x) * 0.18;
+      y += (ty - y) * 0.18;
+      if (aura) aura.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+      raf = Math.abs(tx - x) > 0.4 || Math.abs(ty - y) > 0.4 ? requestAnimationFrame(tick) : 0;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      tx = e.clientX;
+      ty = e.clientY;
+      if (aura) aura.classList.add("on");
+      if (!raf) raf = requestAnimationFrame(tick);
+
+      // Ghi toạ độ vào mọi lớp lồng nhau (nút nằm trong thẻ chẳng hạn).
+      for (let node = e.target as Element | null; node && node !== document.body; node = node.parentElement) {
+        if (node instanceof HTMLElement && node.matches(GLOW_SELECTOR)) {
+          const r = node.getBoundingClientRect();
+          node.style.setProperty("--mx", `${(e.clientX - r.left).toFixed(1)}px`);
+          node.style.setProperty("--my", `${(e.clientY - r.top).toFixed(1)}px`);
+        }
+      }
+    };
+
+    const onLeave = () => aura?.classList.remove("on");
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerleave", onLeave);
+    window.addEventListener("blur", onLeave);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("blur", onLeave);
+    };
+  }, []);
+
+  return <div ref={auraRef} className="cursor-aura" aria-hidden />;
+}
+
 export function AppShell({ initialState }: { initialState: AppState }) {
   const [state, setState] = useState<AppState>(initialState);
   const [tab, setTab] = useState<TabKey>("overview");
@@ -170,6 +231,7 @@ export function AppShell({ initialState }: { initialState: AppState }) {
   return (
     <div className="relative flex min-h-dvh flex-col">
       <Background />
+      <CursorGlow />
       {busy && <div className="busy-bar" />}
 
       <header className="app-header relative z-10 px-4 py-3 sm:px-6">

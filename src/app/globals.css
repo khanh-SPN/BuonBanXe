@@ -310,7 +310,7 @@ body {
   box-shadow: 0 4px 18px rgba(34, 211, 238, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-.btn-primary::after {
+.btn-primary::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -327,7 +327,7 @@ body {
   transform: translateY(-1px);
 }
 
-.btn-primary:hover:not(:disabled)::after {
+.btn-primary:hover:not(:disabled)::before {
   transform: translateX(130%);
 }
 
@@ -1051,5 +1051,383 @@ body {
   100% {
     transform: translate3d(var(--drift, 20px), -110vh, 0) scale(0.2);
     opacity: 0;
+  }
+}
+/* ═════════════════════════════════════════════════════════════════════════
+   RGB THEO CON TRỎ · quầng sáng bám chuột + viền cầu vồng nổi lên chỗ đang trỏ
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Góc xoay của dải cầu vồng. Đăng ký kiểu <angle> để animate mượt được. */
+@property --spin {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  /* Vị trí chuột bên trong phần tử đang trỏ — JS ghi vào --mx/--my. */
+  --mx: 50%;
+  --my: 50%;
+  --rgb-ring: conic-gradient(
+    from var(--spin),
+    #ff2d95,
+    #ff8a00,
+    #ffe600,
+    #24ff8f,
+    #00d9ff,
+    #7b5bff,
+    #ff2d95
+  );
+}
+
+@keyframes spot-spin {
+  to {
+    --spin: 360deg;
+  }
+}
+
+/* ── Quầng RGB bám theo con trỏ trên toàn trang ──────────────────────────── */
+.cursor-aura {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 420px;
+  height: 420px;
+  margin: -210px 0 0 -210px;
+  border-radius: 999px;
+  background: var(--rgb-ring);
+  filter: blur(64px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 55;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  animation: aura-rotate 9s linear infinite;
+  will-change: transform;
+}
+
+.cursor-aura.on {
+  opacity: 0.34;
+}
+
+/* Xoay bằng thuộc tính `rotate` riêng → GPU lo, không phải vẽ lại gradient. */
+@keyframes aura-rotate {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ── Vùng bắt sáng: quầng bên trong + viền cầu vồng ──────────────────────── */
+.card,
+.wallet-card,
+.thumb,
+.paste-zone,
+.modal,
+.btn,
+.tab-btn,
+.chip-choice,
+.pg-btn {
+  --mx: 50%;
+  --my: 50%;
+}
+
+/* Viền phải bám vào chính nó, không thì nó nhảy ra ngoài lớp phủ. */
+.modal,
+.paste-zone,
+.tab-btn,
+.chip-choice {
+  position: relative;
+}
+
+/* Quầng sáng bên trong (chỉ cho mảng lớn) */
+.card::before,
+.wallet-card::before,
+.thumb::before,
+.paste-zone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background:
+    radial-gradient(220px circle at var(--mx) var(--my), rgba(255, 255, 255, 0.09), transparent 62%),
+    var(--rgb-ring);
+  -webkit-mask: radial-gradient(230px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 70%);
+  mask: radial-gradient(230px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.35) 45%, transparent 70%);
+  mix-blend-mode: screen;
+}
+
+.card:hover::before,
+.wallet-card:hover::before,
+.thumb:hover::before,
+.paste-zone:hover::before {
+  opacity: 0.5;
+  animation: spot-spin 6s linear infinite;
+}
+
+/* Viền cầu vồng sáng đúng chỗ con trỏ đang đứng */
+.card::after,
+.wallet-card::after,
+.thumb::after,
+.paste-zone::after,
+.modal::after,
+.btn::after,
+.tab-btn::after,
+.chip-choice::after,
+.pg-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: var(--rgb-ring);
+  -webkit-mask:
+    radial-gradient(210px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 74%),
+    linear-gradient(#000 0 0) content-box;
+  mask:
+    radial-gradient(210px circle at var(--mx) var(--my), #000 0%, rgba(0, 0, 0, 0.4) 45%, transparent 74%),
+    linear-gradient(#000 0 0) content-box;
+  -webkit-mask-composite: source-out;
+  mask-composite: subtract;
+}
+
+.card:hover::after,
+.wallet-card:hover::after,
+.thumb:hover::after,
+.paste-zone:hover::after,
+.modal:hover::after,
+.btn:hover:not(:disabled)::after,
+.tab-btn:hover::after,
+.chip-choice:hover::after,
+.pg-btn:hover:not(:disabled)::after {
+  opacity: 1;
+  animation: spot-spin 5s linear infinite;
+}
+
+/* Nút nhỏ thì viền mảnh hơn cho gọn */
+.btn::after,
+.tab-btn::after,
+.chip-choice::after,
+.pg-btn::after {
+  padding: 1.1px;
+}
+
+/* ── Phân trang ──────────────────────────────────────────────────────────── */
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pg-btn {
+  position: relative;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(103, 232, 249, 0.05), rgba(103, 232, 249, 0)), var(--chip);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.pg-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.pg-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pg-btn.on {
+  border-color: transparent;
+  background: linear-gradient(135deg, #67e8f9 0%, #22d3ee 45%, #0ea5e9 100%);
+  color: var(--accent-ink);
+  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.pg-gap {
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── Chế độ khách (giấu giá vốn để chụp màn hình) ────────────────────────── */
+.guest-btn {
+  position: relative;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  background: linear-gradient(180deg, rgba(103, 232, 249, 0.05), rgba(103, 232, 249, 0)), var(--chip);
+  transition: all 0.18s ease;
+}
+
+.guest-btn:hover {
+  color: var(--accent);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
+.guest-btn.on {
+  border-color: transparent;
+  color: #04121a;
+  background: linear-gradient(135deg, #34d399 0%, #22d3ee 55%, #7b5bff 100%);
+  box-shadow: 0 4px 20px rgba(34, 211, 238, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.guest-btn.on:hover {
+  color: #04121a;
+  filter: brightness(1.06);
+}
+
+.guest-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--good);
+  padding: 4px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* ── Xem ảnh phóng to: luôn nằm giữa MÀN HÌNH ────────────────────────────── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(2, 5, 11, 0.9);
+  backdrop-filter: blur(10px);
+  animation: backdrop-in 0.2s ease-out both;
+  overscroll-behavior: contain;
+}
+
+.lightbox-img {
+  display: block;
+  max-width: min(100%, 1400px);
+  max-height: calc(100dvh - 96px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7), 0 0 60px rgba(34, 211, 238, 0.16);
+  animation: lightbox-in 0.28s cubic-bezier(0.21, 1.02, 0.55, 1.12) both;
+}
+
+@keyframes lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lb-btn {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  width: 46px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(9, 15, 28, 0.8);
+  backdrop-filter: blur(10px);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.lb-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.35);
+  transform: scale(1.08);
+}
+
+.lb-prev {
+  left: 18px;
+  top: 50%;
+  margin-top: -23px;
+}
+
+.lb-next {
+  right: 18px;
+  top: 50%;
+  margin-top: -23px;
+}
+
+.lb-close {
+  right: 18px;
+  top: 18px;
+}
+
+.lb-count {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(9, 15, 28, 0.82);
+  backdrop-filter: blur(10px);
+  padding: 5px 14px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+/* ── Tôn trọng cài đặt giảm chuyển động ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cursor-aura {
+    display: none;
+  }
+
+  .card:hover::before,
+  .wallet-card:hover::before,
+  .thumb:hover::before,
+  .paste-zone:hover::before,
+  .card:hover::after,
+  .wallet-card:hover::after,
+  .thumb:hover::after,
+  .paste-zone:hover::after,
+  .modal:hover::after,
+  .btn:hover:not(:disabled)::after,
+  .tab-btn:hover::after,
+  .chip-choice:hover::after,
+  .pg-btn:hover:not(:disabled)::after {
+    animation: none;
   }
 }

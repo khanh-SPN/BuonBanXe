@@ -29,16 +29,25 @@ function sellableIn(importedAt: string): { ready: boolean; text: string } {
 
 type Filter = "all" | "stock" | "deposit" | "sold";
 
+/** Mỗi trang tối đa 12 xe — vừa đúng 4 hàng × 3 cột trên màn rộng. */
+const PAGE_SIZE = 12;
+
+/** Ảnh đang xem: cả bộ ảnh của 1 xe + vị trí đang đứng. */
+type Zoom = { images: string[]; index: number };
+
 export function VehiclesTab({ api }: { api: Api }) {
   const { state } = api;
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  /** Chế độ khách: giấu giá nhập / giá dự kiến / lãi để chụp màn hình đưa khách xem. */
+  const [guest, setGuest] = useState(false);
   const [modal, setModal] = useState<
     | { kind: "import" }
     | { kind: "deposit" | "sell" | "cancel" | "edit" | "images"; vehicle: Vehicle }
     | null
   >(null);
-  const [zoom, setZoom] = useState<string | null>(null);
+  const [zoom, setZoom] = useState<Zoom | null>(null);
 
   const rows = useMemo(() => {
     const all = [...state.vehicles, ...state.soldVehicles];
@@ -51,6 +60,12 @@ export function VehiclesTab({ api }: { api: Api }) {
       return true;
     });
   }, [state.vehicles, state.soldVehicles, filter, q]);
+
+  // Kẹp lại phòng khi xoá xe làm số trang tụt xuống dưới trang đang đứng.
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const from = (current - 1) * PAGE_SIZE;
+  const pageRows = rows.slice(from, from + PAGE_SIZE);
 
   const counts = state.counts;
 
@@ -70,7 +85,10 @@ export function VehiclesTab({ api }: { api: Api }) {
               key={key}
               type="button"
               className={`chip-choice ${filter === key ? "on" : ""}`}
-              onClick={() => setFilter(key)}
+              onClick={() => {
+                setFilter(key);
+                setPage(1);
+              }}
             >
               {label}
             </button>
@@ -81,37 +99,73 @@ export function VehiclesTab({ api }: { api: Api }) {
             className="input max-w-[240px]"
             placeholder="Tìm tên xe hoặc #id…"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
           />
-          <button type="button" className="btn btn-primary" onClick={() => setModal({ kind: "import" })}>
-            📥 Nhập xe
+          <button
+            type="button"
+            className={`guest-btn ${guest ? "on" : ""}`}
+            onClick={() => setGuest((g) => !g)}
+            title="Giấu giá nhập, giá dự kiến và lãi để chụp màn hình đưa khách xem"
+          >
+            {guest ? "🙈 Đang giấu giá" : "👁 Chế độ khách"}
           </button>
+          {!guest && (
+            <button type="button" className="btn btn-primary" onClick={() => setModal({ kind: "import" })}>
+              📥 Nhập xe
+            </button>
+          )}
         </div>
       </div>
+
+      {guest && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="guest-note">🙈 Chế độ khách đang bật — đã giấu giá nhập, giá dự kiến và lãi</span>
+          <button type="button" className="btn btn-sm" onClick={() => setGuest(false)}>
+            Hiện lại giá
+          </button>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="card">
           <Empty>Không có xe nào khớp bộ lọc.</Empty>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map((v) => (
-            <VehicleCard
-              key={v.id}
-              vehicle={v}
-              images={state.images[v.id] ?? []}
-              onZoom={setZoom}
-              onAction={(kind) => setModal({ kind, vehicle: v })}
-              onUnsell={() => api.send("/api/vehicle", { action: "unsell", id: v.id })}
-              onDelete={() => {
-                if (confirm(`Xoá hẳn ${v.name} (#${v.id})? Mọi khoản liên quan trong ví cũng bị gỡ.`)) {
-                  api.send("/api/vehicle", { action: "delete", id: v.id });
-                }
-              }}
-              busy={api.busy}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {pageRows.map((v) => {
+              const images = state.images[v.id] ?? [];
+              return (
+                <VehicleCard
+                  key={v.id}
+                  vehicle={v}
+                  images={images}
+                  guest={guest}
+                  onZoom={(index) => setZoom({ images: images.map((i) => i.path), index })}
+                  onAction={(kind) => setModal({ kind, vehicle: v })}
+                  onUnsell={() => api.send("/api/vehicle", { action: "unsell", id: v.id })}
+                  onDelete={() => {
+                    if (confirm(`Xoá hẳn ${v.name} (#${v.id})? Mọi khoản liên quan trong ví cũng bị gỡ.`)) {
+                      api.send("/api/vehicle", { action: "delete", id: v.id });
+                    }
+                  }}
+                  busy={api.busy}
+                />
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[11.5px] text-[var(--muted)]">
+              Hiện {from + 1}–{from + pageRows.length} trên {rows.length} xe
+              {totalPages > 1 && ` · trang ${current}/${totalPages}`}
+            </p>
+            {totalPages > 1 && <Pager page={current} total={totalPages} onGo={setPage} />}
+          </div>
+        </>
       )}
 
       {modal?.kind === "import" && <ImportModal api={api} onClose={() => setModal(null)} />}
@@ -126,7 +180,67 @@ export function VehiclesTab({ api }: { api: Api }) {
       {modal?.kind === "images" && (
         <ImagesModal api={api} vehicle={modal.vehicle} onClose={() => setModal(null)} onZoom={setZoom} />
       )}
-      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
+      {zoom && (
+        <Lightbox
+          images={zoom.images}
+          index={zoom.index}
+          onIndex={(index) => setZoom((z) => (z ? { ...z, index } : z))}
+          onClose={() => setZoom(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Phân trang ────────────────────────────────────────────────────────────────
+/** Dãy số trang rút gọn: luôn có trang đầu, trang cuối và vùng quanh trang hiện tại. */
+function pageList(page: number, total: number): (number | "gap")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const around = new Set([1, total, page, page - 1, page + 1]);
+  if (page <= 3) [2, 3, 4].forEach((n) => around.add(n));
+  if (page >= total - 2) [total - 3, total - 2, total - 1].forEach((n) => around.add(n));
+
+  const nums = [...around].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  nums.forEach((n, i) => {
+    if (i > 0 && n - nums[i - 1] > 1) out.push("gap");
+    out.push(n);
+  });
+  return out;
+}
+
+function Pager({ page, total, onGo }: { page: number; total: number; onGo: (p: number) => void }) {
+  return (
+    <div className="pager">
+      <button type="button" className="pg-btn" onClick={() => onGo(page - 1)} disabled={page <= 1} aria-label="Trang trước">
+        ‹
+      </button>
+      {pageList(page, total).map((p, i) =>
+        p === "gap" ? (
+          <span key={`gap-${i}`} className="pg-gap">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            type="button"
+            className={`pg-btn ${p === page ? "on" : ""}`}
+            onClick={() => onGo(p)}
+            aria-current={p === page ? "page" : undefined}
+          >
+            {p}
+          </button>
+        ),
+      )}
+      <button
+        type="button"
+        className="pg-btn"
+        onClick={() => onGo(page + 1)}
+        disabled={page >= total}
+        aria-label="Trang sau"
+      >
+        ›
+      </button>
     </div>
   );
 }
@@ -135,6 +249,7 @@ export function VehiclesTab({ api }: { api: Api }) {
 function VehicleCard({
   vehicle: v,
   images,
+  guest,
   onZoom,
   onAction,
   onUnsell,
@@ -143,7 +258,8 @@ function VehicleCard({
 }: {
   vehicle: Vehicle;
   images: { id: number; path: string }[];
-  onZoom: (src: string) => void;
+  guest: boolean;
+  onZoom: (index: number) => void;
   onAction: (kind: "deposit" | "sell" | "cancel" | "edit" | "images") => void;
   onUnsell: () => void;
   onDelete: () => void;
@@ -160,7 +276,7 @@ function VehicleCard({
         <button
           type="button"
           className="thumb h-24 w-32 shrink-0 rounded-none border-0 border-r border-[var(--line)]"
-          onClick={() => (images[0] ? onZoom(images[0].path) : onAction("images"))}
+          onClick={() => (images[0] ? onZoom(0) : onAction("images"))}
           title={images[0] ? "Xem ảnh" : "Thêm ảnh"}
         >
           {images[0] ? (
@@ -171,7 +287,7 @@ function VehicleCard({
             </span>
           )}
           {images.length > 1 && (
-            <span className="absolute bottom-1 right-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white">
+            <span className="absolute bottom-1 right-1 z-[3] rounded bg-black/65 px-1.5 py-0.5 text-[10px] text-white">
               {images.length}
             </span>
           )}
@@ -189,22 +305,34 @@ function VehicleCard({
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
-            <span className="text-[var(--muted)]">Giá nhập</span>
-            <span className="text-right"><Ig v={v.purchase_price} /></span>
+            {!guest && (
+              <>
+                <span className="text-[var(--muted)]">Giá nhập</span>
+                <span className="text-right"><Ig v={v.purchase_price} /></span>
+              </>
+            )}
 
             {sold ? (
               <>
                 <span className="text-[var(--muted)]">Giá bán</span>
                 <span className="text-right"><Ig v={v.actual_price} /></span>
-                <span className="text-[var(--muted)]">Lãi thực</span>
-                <span className="text-right"><Ig v={v.profit} tone="auto" /></span>
+                {!guest && (
+                  <>
+                    <span className="text-[var(--muted)]">Lãi thực</span>
+                    <span className="text-right"><Ig v={v.profit} tone="auto" /></span>
+                  </>
+                )}
                 <span className="text-[var(--muted)]">Ngày bán</span>
                 <span className="text-right text-[11px] text-[var(--muted)]">{formatDateTime(v.sold_at)}</span>
               </>
             ) : (
               <>
-                <span className="text-[var(--muted)]">Dự kiến</span>
-                <span className="text-right"><Ig v={v.expected_price} /></span>
+                {!guest && (
+                  <>
+                    <span className="text-[var(--muted)]">Dự kiến</span>
+                    <span className="text-right"><Ig v={v.expected_price} /></span>
+                  </>
+                )}
                 {v.deposit_amount != null && (
                   <>
                     <span className="text-[var(--muted)]">Cọc</span>
@@ -221,44 +349,46 @@ function VehicleCard({
             )}
           </div>
 
-          {v.customer_name && (
+          {v.customer_name && !guest && (
             <p className="mt-1.5 truncate text-[11.5px] text-[var(--ink-soft)]">👤 {v.customer_name}</p>
           )}
           {v.note && <p className="mt-1 line-clamp-2 text-[11px] text-[var(--muted)]">📝 {v.note}</p>}
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 border-t border-[var(--line)] bg-[var(--panel)]/40 p-2">
-        {!sold && v.status === "Còn hàng" && (
-          <button type="button" className="btn btn-sm" onClick={() => onAction("deposit")} disabled={busy}>
-            🟡 Nhận cọc
+      {!guest && (
+        <div className="flex flex-wrap gap-1.5 border-t border-[var(--line)] bg-[var(--panel)]/40 p-2">
+          {!sold && v.status === "Còn hàng" && (
+            <button type="button" className="btn btn-sm" onClick={() => onAction("deposit")} disabled={busy}>
+              🟡 Nhận cọc
+            </button>
+          )}
+          {!sold && v.status === "đã đặt cọc" && (
+            <button type="button" className="btn btn-sm" onClick={() => onAction("cancel")} disabled={busy}>
+              🔴 Huỷ cọc
+            </button>
+          )}
+          {!sold && (
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => onAction("sell")} disabled={busy}>
+              💰 Bán
+            </button>
+          )}
+          {sold && (
+            <button type="button" className="btn btn-sm" onClick={onUnsell} disabled={busy}>
+              ↩️ Hoàn tác bán
+            </button>
+          )}
+          <button type="button" className="btn btn-sm" onClick={() => onAction("images")} disabled={busy}>
+            🖼 Ảnh
           </button>
-        )}
-        {!sold && v.status === "đã đặt cọc" && (
-          <button type="button" className="btn btn-sm" onClick={() => onAction("cancel")} disabled={busy}>
-            🔴 Huỷ cọc
+          <button type="button" className="btn btn-sm" onClick={() => onAction("edit")} disabled={busy}>
+            ✏️ Sửa
           </button>
-        )}
-        {!sold && (
-          <button type="button" className="btn btn-sm btn-primary" onClick={() => onAction("sell")} disabled={busy}>
-            💰 Bán
+          <button type="button" className="btn btn-sm btn-danger" onClick={onDelete} disabled={busy}>
+            Xoá
           </button>
-        )}
-        {sold && (
-          <button type="button" className="btn btn-sm" onClick={onUnsell} disabled={busy}>
-            ↩️ Hoàn tác bán
-          </button>
-        )}
-        <button type="button" className="btn btn-sm" onClick={() => onAction("images")} disabled={busy}>
-          🖼 Ảnh
-        </button>
-        <button type="button" className="btn btn-sm" onClick={() => onAction("edit")} disabled={busy}>
-          ✏️ Sửa
-        </button>
-        <button type="button" className="btn btn-sm btn-danger" onClick={onDelete} disabled={busy}>
-          Xoá
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -605,7 +735,7 @@ function ImagesModal({
   api: Api;
   vehicle: Vehicle;
   onClose: () => void;
-  onZoom: (src: string) => void;
+  onZoom: (zoom: Zoom) => void;
 }) {
   const images = api.state.images[vehicle.id] ?? [];
 
@@ -628,9 +758,14 @@ function ImagesModal({
         <p className="text-center text-[12px] text-[var(--muted)]">Chưa có ảnh nào cho xe này.</p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {images.map((img) => (
+          {images.map((img, index) => (
             <div key={img.id} className="thumb aspect-[4/3]">
-              <Thumb src={img.path} alt={vehicle.name} onClick={() => onZoom(img.path)} className="cursor-zoom-in" />
+              <Thumb
+                src={img.path}
+                alt={vehicle.name}
+                onClick={() => onZoom({ images: images.map((i) => i.path), index })}
+                className="cursor-zoom-in"
+              />
               <button
                 type="button"
                 className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] text-white"

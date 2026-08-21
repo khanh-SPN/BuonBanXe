@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { formatIg, formatVnd, groupDigits, parseMoney } from "@/lib/money";
 import type { AppState, VehicleStatus } from "@/lib/types";
 
@@ -227,6 +228,62 @@ export function buildAt(date: string, time: string): string {
   return new Date(`${date}T${time}:00+07:00`).toISOString();
 }
 
+// ── Lớp phủ (modal / xem ảnh) ─────────────────────────────────────────────────
+
+/**
+ * Đưa lớp phủ ra thẳng <body>.
+ *
+ * Bắt buộc phải làm vậy: khung nội dung đang có `animation ... both`, mà
+ * animation giữ lại `transform` nên nó biến thành gốc toạ độ mới cho
+ * `position: fixed`. Nếu render tại chỗ thì lớp phủ sẽ căn giữa theo *danh sách
+ * xe* và trôi theo trang khi lăn chuột, chứ không giữa màn hình.
+ */
+const noSubscribe = () => () => {};
+
+function Portal({ children }: { children: ReactNode }) {
+  // Server không có document — chỉ dựng cổng sau khi đã ở trên trình duyệt.
+  const onClient = useSyncExternalStore(noSubscribe, () => true, () => false);
+  return onClient ? createPortal(children, document.body) : null;
+}
+
+/** Khoá cuộn trang khi có lớp phủ — đếm tầng để mở modal trong modal vẫn đúng. */
+let scrollLocks = 0;
+let savedOverflow = "";
+let savedPadRight = "";
+
+function useScrollLock() {
+  useEffect(() => {
+    if (scrollLocks++ === 0) {
+      const { body, documentElement } = document;
+      // Trang cuộn ở <html> chứ không phải <body>, nên phải khoá ở <html>.
+      savedOverflow = documentElement.style.overflow;
+      savedPadRight = body.style.paddingRight;
+      const barWidth = window.innerWidth - documentElement.clientWidth;
+      documentElement.style.overflow = "hidden";
+      if (barWidth > 0) body.style.paddingRight = `${barWidth}px`;
+    }
+    return () => {
+      if (--scrollLocks === 0) {
+        document.documentElement.style.overflow = savedOverflow;
+        document.body.style.paddingRight = savedPadRight;
+      }
+    };
+  }, []);
+}
+
+/** Bắt phím khi lớp phủ đang mở. */
+function useHotkeys(handler: (e: KeyboardEvent) => void) {
+  const ref = useRef(handler);
+  useEffect(() => {
+    ref.current = handler;
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => ref.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 export function Modal({
   title,
@@ -241,35 +298,29 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useScrollLock();
+  useHotkeys((e) => {
+    if (e.key === "Escape") onClose();
+  });
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="card-head">
-          <h3>
-            {icon && <span className="mr-1.5">{icon}</span>}
-            {title}
-          </h3>
-          <button
-            type="button"
-            className="btn btn-sm !px-2.5"
-            onClick={onClose}
-            aria-label="Đóng"
-          >
-            ✕
-          </button>
+    <Portal>
+      <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="modal">
+          <div className="card-head">
+            <h3>
+              {icon && <span className="mr-1.5">{icon}</span>}
+              {title}
+            </h3>
+            <button type="button" className="btn btn-sm !px-2.5" onClick={onClose} aria-label="Đóng">
+              ✕
+            </button>
+          </div>
+          <div className="grid gap-3.5 p-4">{children}</div>
+          {footer && <div className="flex items-center gap-2 border-t border-[var(--line)] p-4">{footer}</div>}
         </div>
-        <div className="grid gap-3.5 p-4">{children}</div>
-        {footer && <div className="flex items-center gap-2 border-t border-[var(--line)] p-4">{footer}</div>}
       </div>
-    </div>
+    </Portal>
   );
 }
 
@@ -402,17 +453,65 @@ export function Thumb({
   );
 }
 
-export function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+/**
+ * Xem ảnh phóng to. Lớp phủ nằm thẳng dưới <body> và `position: fixed` nên ảnh
+ * luôn ở chính giữa màn hình; trang cũng bị khoá cuộn nên lăn chuột ảnh vẫn
+ * đứng yên giữa màn hình.
+ */
+export function Lightbox({
+  images,
+  index,
+  onIndex,
+  onClose,
+}: {
+  images: string[];
+  index: number;
+  onIndex: (next: number) => void;
+  onClose: () => void;
+}) {
+  useScrollLock();
+
+  const count = images.length;
+  const safe = count === 0 ? 0 : ((index % count) + count) % count;
+  const step = useCallback(
+    (delta: number) => {
+      if (count > 1) onIndex((((safe + delta) % count) + count) % count);
+    },
+    [count, safe, onIndex],
+  );
+
+  useHotkeys((e) => {
+    if (e.key === "Escape") onClose();
+    if (e.key === "ArrowLeft") step(-1);
+    if (e.key === "ArrowRight") step(1);
+  });
+
+  if (count === 0) return null;
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="Ảnh xe" className="m-auto max-h-[88vh] max-w-full rounded-xl border border-[var(--line)]" />
-    </div>
+    <Portal>
+      <div className="lightbox" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img key={images[safe]} src={images[safe]} alt="Ảnh xe" className="lightbox-img" />
+
+        <button type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Đóng">
+          ✕
+        </button>
+
+        {count > 1 && (
+          <>
+            <button type="button" className="lb-btn lb-prev" onClick={() => step(-1)} aria-label="Ảnh trước">
+              ‹
+            </button>
+            <button type="button" className="lb-btn lb-next" onClick={() => step(1)} aria-label="Ảnh sau">
+              ›
+            </button>
+            <span className="lb-count">
+              {safe + 1} / {count}
+            </span>
+          </>
+        )}
+      </div>
+    </Portal>
   );
 }
