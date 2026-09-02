@@ -91,6 +91,47 @@ export interface VehicleImage {
   created_at: string;
 }
 
+/** Ảnh chụp tài sản ròng tại một mốc thời gian. */
+export interface MonthSnapshot {
+  at: string;
+  walletIg: number;
+  capitalInStock: number;
+  debtNet: number;
+  depositHeld: number;
+  netWorth: number;
+}
+
+/** Một dòng trong bảng chốt tháng. Mọi số đều tự suy ra từ dữ liệu. */
+export interface MonthClosing {
+  key: string;
+  label: string;
+  /** Vốn đầu kỳ = vốn cuối kỳ của tháng trước. */
+  open: number;
+  openSnapshot: MonthSnapshot;
+  /** Nạp vốn: tiền thật đổi thành IG. */
+  capitalIn: number;
+  /** Rút vốn: IG đổi ngược thành tiền thật (số dương). */
+  capitalOut: number;
+  carProfit: number;
+  soldCount: number;
+  importedCount: number;
+  importCost: number;
+  otherNet: number;
+  adjust: number;
+  /** Lãi thực trong tháng = lãi xe + thu/chi khác. */
+  profit: number;
+  close: number;
+  closeSnapshot: MonthSnapshot;
+  /** Vốn cuối kỳ mà phương trình dự đoán. */
+  expected: number;
+  /** close − expected. Khác 0 là có tiền đi đâu đó mà sổ quỹ không ghi. */
+  gap: number;
+  roi: number | null;
+  /** Sổ quỹ có phủ trọn tháng này không. */
+  tracked: boolean;
+  running: boolean;
+}
+
 export interface PeriodStat {
   key: string;
   label: string;
@@ -150,4 +191,5 @@ export interface AppState {
   igTrades: IgTrade[];
   daily: PeriodStat[];
   monthly: PeriodStat[];
+  closings: MonthClosing[];
 }

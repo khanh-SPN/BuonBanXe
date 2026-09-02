@@ -1,4 +1,5 @@
 import { allVehicleImages, getVehicleStats } from "./inventory";
+import { getMonthlyClosings } from "./closing";
 import {
   debtTotals,
   getBalances,
@@ -44,5 +45,6 @@ export function getState(): AppState {
     igTrades: listIgTrades(200),
     daily: stats.daily,
     monthly: stats.monthly,
+    closings: getMonthlyClosings(),
   });
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { TAX_LABEL, formatIg, formatShort, formatVnd, groupDigits } from "@/lib/money";
 import { formatDateTime, toLocalDateKey, toLocalMonthKey } from "@/lib/datetime";
-import type { PeriodStat, Vehicle } from "@/lib/types";
+import type { MonthClosing, PeriodStat, Vehicle } from "@/lib/types";
 import { type Api, Empty, Metric, Modal, StatusPill } from "@/components/ui";
 
 type Period = "daily" | "monthly";
@@ -19,16 +19,47 @@ export function ReportTab({ api }: { api: Api }) {
   const vndSpent = igBought.reduce((s, t) => s + t.vnd_amount, 0);
   const vndEarned = igSold.reduce((s, t) => s + t.vnd_amount, 0);
 
+  const now = state.closings[0] ?? null;
+
   return (
     <div className="grid gap-4">
+      {now && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric
+            label={`Vốn đầu ${now.label.toLowerCase()}`}
+            value={formatIg(now.open)}
+            sub="chốt từ cuối tháng trước"
+          />
+          <Metric
+            label="Lãi tháng này"
+            value={formatIg(now.profit)}
+            tone={now.profit > 0 ? "good" : now.profit < 0 ? "bad" : undefined}
+            sub={now.roi != null ? `${(now.roi * 100).toFixed(1)}% trên vốn đầu kỳ` : undefined}
+          />
+          <Metric
+            label="Vốn hiện tại"
+            value={formatIg(now.close)}
+            sub="ví IG + vốn kho + nợ ròng − cọc"
+          />
+          <Metric
+            label="Đã rút ra tiền thật"
+            value={formatIg(now.capitalOut)}
+            tone="warn"
+            sub={`nạp vào ${formatIg(now.capitalIn)}`}
+          />
+        </div>
+      )}
+
+      <ClosingTable rows={state.closings} />
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Tổng xe đã bán" value={`${state.counts.sold} xe`} sub={`trên tổng ${state.counts.total} xe`} />
         <Metric label="Tổng tiền bán ra" value={formatIg(state.totals.sold)} />
         <Metric
-          label="Tổng lãi thực"
+          label="Tổng lãi thực (cộng dồn trọn đời)"
           value={formatIg(state.totals.profit)}
           tone={state.totals.profit >= 0 ? "good" : "bad"}
-          sub="đã trừ thuế bán"
+          sub="đã trừ thuế bán — không phải tiền đang có"
         />
         <Metric label="Tổng tiền nhập xe" value={formatIg(state.totals.purchase)} />
         <Metric label="Tiền thật đã bỏ ra mua IG" value={formatVnd(vndSpent)} sub={`${igBought.length} lần nhập IG`} />
@@ -343,5 +374,156 @@ function PeriodDetail({
         không chịu thuế.
       </p>
     </Modal>
+  );
+}
+
+// ── Chốt tháng ────────────────────────────────────────────────────────────────
+
+/**
+ * Mỗi tháng là một phương trình đóng, vốn cuối kỳ tháng này là vốn đầu kỳ
+ * tháng sau. Cột "Lệch" luôn hiện — kể cả bằng 0 — vì bảng chốt mà giấu chỗ
+ * lệch thì chốt để làm gì.
+ */
+function ClosingTable({ rows }: { rows: MonthClosing[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="card-head">
+        <h3>
+          Chốt tháng
+          <span className="ml-2 font-normal text-[11px] text-[var(--muted)]">
+            vốn cuối tháng này = vốn đầu tháng sau · bấm một dòng để xem vốn nằm ở đâu
+          </span>
+        </h3>
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty>Chưa có dữ liệu để chốt.</Empty>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Tháng</th>
+                <th className="text-right">Vốn đầu kỳ</th>
+                <th className="text-right">Nạp vốn</th>
+                <th className="text-right">Rút vốn</th>
+                <th className="text-right">Lãi xe</th>
+                <th className="text-right">Thu/chi khác</th>
+                <th className="text-right">Lãi thực</th>
+                <th className="text-right">%</th>
+                <th className="text-right">Vốn cuối kỳ</th>
+                <th className="text-right">Lệch</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <FragmentRow key={r.key} r={r} open={open === r.key} onToggle={() => setOpen(open === r.key ? null : r.key)} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="border-t border-[var(--line)] px-3 py-2 text-[11px] text-[var(--muted)]">
+        Vốn = ví IG + vốn kho (giá nhập xe chưa bán) + nợ ròng − cọc đang giữ. Mua / bán IG bằng tiền
+        thật là <b>nạp / rút vốn</b>, không phải lãi — nên lãi tháng không bao giờ bằng số dư ví.
+      </p>
+    </div>
+  );
+}
+
+function FragmentRow({ r, open, onToggle }: { r: MonthClosing; open: boolean; onToggle: () => void }) {
+  const gapBad = Math.abs(r.gap) > 0;
+  return (
+    <>
+      <tr
+        className="row-click"
+        onClick={onToggle}
+        tabIndex={0}
+        role="button"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
+        <td className="nowrap text-[var(--ink)]">
+          {r.label}
+          {r.running && <span className="ml-1.5 text-[10px] text-[var(--warn)]">đang chạy</span>}
+          {!r.tracked && <span className="ml-1.5 text-[10px] text-[var(--muted)]">thiếu sổ quỹ</span>}
+          <span className="ml-1.5 text-[10px] text-[var(--muted)]">{open ? "⌄" : "›"}</span>
+        </td>
+        <td className="tnum nowrap text-right text-[var(--ink-soft)]">{groupDigits(r.open)}</td>
+        <td className="tnum nowrap text-right text-[var(--good)]">{r.capitalIn ? `+${groupDigits(r.capitalIn)}` : "—"}</td>
+        <td className="tnum nowrap text-right text-[var(--warn)]">{r.capitalOut ? `−${groupDigits(r.capitalOut)}` : "—"}</td>
+        <td className="tnum nowrap text-right">{r.carProfit ? groupDigits(r.carProfit) : "—"}</td>
+        <td className="tnum nowrap text-right text-[var(--muted)]">{r.otherNet ? groupDigits(r.otherNet) : "—"}</td>
+        <td className={`tnum nowrap text-right font-semibold ${r.profit > 0 ? "text-[var(--good)]" : r.profit < 0 ? "text-[var(--bad)]" : "text-[var(--muted)]"}`}>
+          {groupDigits(r.profit)}
+        </td>
+        <td className="tnum nowrap text-right text-[var(--muted)]">
+          {r.roi != null ? `${(r.roi * 100).toFixed(1)}%` : "—"}
+        </td>
+        <td className="tnum nowrap text-right font-semibold text-[var(--ink)]">{groupDigits(r.close)}</td>
+        <td className={`tnum nowrap text-right ${gapBad ? "text-[var(--bad)]" : "text-[var(--muted)]"}`}>
+          {gapBad ? groupDigits(r.gap) : "0"}
+        </td>
+      </tr>
+
+      {open && (
+        <tr>
+          <td colSpan={10} className="bg-[var(--panel)]/40 px-3 py-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <SnapshotBox title={`Vốn đầu kỳ — ${groupDigits(r.open)} IG`} s={r.openSnapshot} />
+              <SnapshotBox title={`Vốn cuối kỳ — ${groupDigits(r.close)} IG`} s={r.closeSnapshot} />
+            </div>
+
+            <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--chip)] p-3 text-[12px]">
+              <p className="tnum">
+                {groupDigits(r.open)} <span className="text-[var(--muted)]">vốn đầu</span>
+                {" + "}{groupDigits(r.capitalIn)} <span className="text-[var(--muted)]">nạp</span>
+                {" − "}{groupDigits(r.capitalOut)} <span className="text-[var(--muted)]">rút</span>
+                {" + "}{groupDigits(r.profit)} <span className="text-[var(--muted)]">lãi</span>
+                {r.adjust ? <>{" + "}{groupDigits(r.adjust)} <span className="text-[var(--muted)]">điều chỉnh</span></> : null}
+                {" = "}<b>{groupDigits(r.expected)}</b>
+              </p>
+              <p className="mt-1 text-[var(--muted)]">
+                Thực tế {groupDigits(r.close)} →{" "}
+                {r.gap === 0 ? (
+                  <span className="text-[var(--good)]">khớp tuyệt đối</span>
+                ) : (
+                  <span className="text-[var(--bad)]">lệch {groupDigits(r.gap)} IG</span>
+                )}
+                {!r.tracked && " — tháng này sổ quỹ chưa phủ hết nên không thể cân."}
+              </p>
+              <p className="mt-1 text-[var(--muted)]">
+                Nhập {r.importedCount} xe ({groupDigits(r.importCost)}) · bán {r.soldCount} xe.
+              </p>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function SnapshotBox({ title, s }: { title: string; s: MonthClosing["openSnapshot"] }) {
+  const line = (k: string, v: number) => (
+    <div className="flex justify-between gap-3">
+      <span className="text-[var(--muted)]">{k}</span>
+      <span className="tnum text-[var(--ink-soft)]">{groupDigits(v)}</span>
+    </div>
+  );
+  return (
+    <div className="rounded-xl border border-[var(--line)] bg-[var(--chip)] p-3 text-[12px]">
+      <p className="eyebrow mb-1.5">{title}</p>
+      {line("Ví IG", s.walletIg)}
+      {line("Vốn kho", s.capitalInStock)}
+      {line("Nợ ròng", s.debtNet)}
+      {line("Cọc đang giữ (trừ ra)", -s.depositHeld)}
+    </div>
   );
 }
